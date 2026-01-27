@@ -1,0 +1,25 @@
+{
+  "name": "last-piece",
+  "version": "1.0.0",
+  "description": "Enterprise-grade e-commerce platform for unique, one-of-a-kind products",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "start": "npm start --workspace=backend",
+    "test": "npm test --workspace=backend && npm test --workspace=frontend",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "docker:build": "docker-compose -f devops/docker-compose.yml build",
+    "docker:up": "docker-compose -f devops/docker-compose.yml up",
+    "docker:down": "docker-compose -f devops/docker-compose.yml down"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
