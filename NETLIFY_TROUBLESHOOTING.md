@@ -29,15 +29,9 @@ Your publish directory was not found at: /opt/build/repo/.next
      NODE_VERSION=18
      ```
 
-#### Option 2: Using netlify.toml from Root
-If the above doesn't work, move `netlify.toml` to project root:
+#### Option 2: Using netlify.toml from Root (Already Done!)
+The `netlify.toml` is now at the project root with the correct configuration:
 
-```bash
-# From project root
-mv frontend/netlify.toml ./netlify.toml
-```
-
-Then update it:
 ```toml
 [build]
   base = "frontend"
@@ -47,6 +41,8 @@ Then update it:
 [build.environment]
   NODE_VERSION = "18"
 ```
+
+This is the recommended approach and should work out of the box!
 
 #### Option 3: Enable Essential Next.js Plugin
 Netlify should auto-detect Next.js and enable the Essential Next.js plugin. If it doesn't:

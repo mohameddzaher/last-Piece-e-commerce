@@ -108,10 +108,12 @@ mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/lastpiece?retryWrites
    - Select `last-Piece-e-commerce` repository
 
 3. **Configure Build Settings**:
-   - **Base directory**: `frontend`
-   - **Build command**: `npm run build`
-   - **Publish directory**: `frontend/.next` (full path from repo root)
-   - Leave other fields empty
+   - Netlify will auto-detect settings from `netlify.toml` in your repo
+   - Just verify:
+     - **Base directory**: `frontend`
+     - **Build command**: `npm run build`
+     - **Publish directory**: `frontend/.next`
+   - These are already configured in the `netlify.toml` file
 
 4. **Environment Variables**:
    Click **Site settings** → **Environment variables** → **Add a variable**:
@@ -147,15 +149,14 @@ After deploying frontend:
 
 ---
 
-### Step 3: Update Netlify Redirects
+### Step 3: Update Backend URL in netlify.toml
 
-1. In Netlify dashboard, go to your site
-2. Go to **Site settings** → **Build & deploy** → **Post processing**
-3. The `netlify.toml` file already handles redirects
-4. Update `netlify.toml` line 12 with your Render backend URL:
+1. Open `netlify.toml` in your repository (at the root level)
+2. Update line 15 with your actual Render backend URL:
    ```toml
-   to = "https://your-backend-url.onrender.com/api/:splat"
+   to = "https://your-actual-backend.onrender.com/api/:splat"
    ```
+3. Commit and push this change to trigger a new deployment
 
 ---
 

@@ -1,9 +1,10 @@
 # Netlify configuration for Next.js deployment
-# Note: Netlify automatically uses Essential Next.js plugin for Next.js projects
+# This file is at the project root to properly configure the frontend deployment
 
 [build]
+  base = "frontend"
   command = "npm run build"
-  publish = ".next"
+  publish = "frontend/.next"
 
 [build.environment]
   NODE_VERSION = "18"
