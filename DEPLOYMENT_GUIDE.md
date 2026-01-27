@@ -110,18 +110,21 @@ mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/lastpiece?retryWrites
 3. **Configure Build Settings**:
    - **Base directory**: `frontend`
    - **Build command**: `npm run build`
-   - **Publish directory**: `frontend/.next`
-   - **Node version**: `18`
+   - **Publish directory**: `frontend/.next` (full path from repo root)
+   - Leave other fields empty
 
 4. **Environment Variables**:
    Click **Site settings** → **Environment variables** → **Add a variable**:
 
    ```env
+   NODE_VERSION=18
    NEXT_PUBLIC_API_URL=https://lastpiece-backend.onrender.com/api
    NEXT_PUBLIC_SITE_URL=https://your-site-name.netlify.app
    ```
 
-   **⚠️ IMPORTANT**: Replace URLs with your actual Render backend URL
+   **⚠️ IMPORTANT**:
+   - Replace URLs with your actual Render backend URL
+   - `NODE_VERSION=18` is required for Next.js 14
 
 5. **Deploy**: Click **Deploy site**
 
@@ -198,11 +201,18 @@ After deploying frontend:
   - Check backend is deployed and running
   - Update `netlify.toml` redirect URL
 
-**Problem**: Build fails
-- **Solution**: 
+**Problem**: Build fails with "publish directory not found"
+- **Solution**:
+  - Set publish directory to `frontend/.next` (full path from repo root)
+  - Set base directory to `frontend`
+  - See `NETLIFY_TROUBLESHOOTING.md` for detailed solutions
+
+**Problem**: Other build failures
+- **Solution**:
   - Check build logs in Netlify
   - Verify all dependencies in `package.json`
   - Try clearing cache and redeploying
+  - Run `npm run build` locally to test
 
 ---
 
