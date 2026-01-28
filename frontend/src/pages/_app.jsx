@@ -1,6 +1,7 @@
 import '@/styles/globals.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { useEffect, useState } from 'react';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -89,12 +90,17 @@ function MyApp({ Component, pageProps }) {
     setMounted(true);
   }, []);
 
-  // During SSG/prerender we must not use useRouter or render Header. Return minimal shell.
-  if (!mounted) {
-    return null;
-  }
-
-  return <AppContent Component={Component} pageProps={pageProps} />;
+  // Default document meta (no custom _document to avoid Netlify "Html outside _document" error)
+  return (
+    <>
+      <Head>
+        <meta charSet="utf-8" />
+        <meta name="theme-color" content="#0F172A" />
+        <meta name="description" content="Last Piece - Discover unique, one-of-a-kind products" />
+      </Head>
+      {!mounted ? null : <AppContent Component={Component} pageProps={pageProps} />}
+    </>
+  );
 }
 
 export default MyApp;
