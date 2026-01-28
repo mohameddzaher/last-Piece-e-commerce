@@ -4,7 +4,8 @@
 [build]
   base = "frontend"
   command = "npm run build"
-  publish = "frontend/.next"
+  # Publish is relative to base; next build outputs to .next inside frontend/
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
