@@ -2,11 +2,12 @@ import express from 'express';
 import Category from '../models/Category.js';
 import { generateSlug } from '../utils/helpers.js';
 import { protect, authorize } from '../middleware/auth.js';
+import { requireDB } from '../middleware/dbCheck.js';
 
 const router = express.Router();
 
 // Get all categories (public)
-router.get('/', async (req, res, next) => {
+router.get('/', requireDB, async (req, res, next) => {
   try {
     const categories = await Category.find({ isActive: true }).sort('order');
     res.status(200).json({
@@ -19,7 +20,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // Get category by slug (public)
-router.get('/:slug', async (req, res, next) => {
+router.get('/:slug', requireDB, async (req, res, next) => {
   try {
     const category = await Category.findOne({ slug: req.params.slug, isActive: true });
     if (!category) {
@@ -38,7 +39,7 @@ router.get('/:slug', async (req, res, next) => {
 });
 
 // Create category (admin only)
-router.post('/', protect, authorize('admin', 'super-admin'), async (req, res, next) => {
+router.post('/', protect, authorize('admin', 'super-admin'), requireDB, async (req, res, next) => {
   try {
     const { name, description, image, icon, parent, order } = req.body;
 
@@ -79,7 +80,7 @@ router.post('/', protect, authorize('admin', 'super-admin'), async (req, res, ne
 });
 
 // Update category (admin only)
-router.put('/:id', protect, authorize('admin', 'super-admin'), async (req, res, next) => {
+router.put('/:id', protect, authorize('admin', 'super-admin'), requireDB, async (req, res, next) => {
   try {
     const category = await Category.findByIdAndUpdate(
       req.params.id,
@@ -105,7 +106,7 @@ router.put('/:id', protect, authorize('admin', 'super-admin'), async (req, res, 
 });
 
 // Delete category (admin only)
-router.delete('/:id', protect, authorize('admin', 'super-admin'), async (req, res, next) => {
+router.delete('/:id', protect, authorize('admin', 'super-admin'), requireDB, async (req, res, next) => {
   try {
     const category = await Category.findByIdAndUpdate(
       req.params.id,
