@@ -54,7 +54,7 @@ app.use(helmet({
   },
 }));
 
-// CORS: في الإنتاج اقبل Netlify + FRONTEND_URL + لوكال. على Render ضع FRONTEND_URL=https://last-piece.netlify.app
+// CORS: allow Netlify, FRONTEND_URL, and localhost. Set FRONTEND_URL=https://last-piece.netlify.app on Render
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'https://last-piece.netlify.app',
