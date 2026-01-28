@@ -139,7 +139,7 @@ export default function EditProduct() {
 
         const res = await uploadAPI.uploadSingle(formDataUpload);
         if (res.data.success) {
-          const imageUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${res.data.data.url}`;
+          const imageUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://last-piece-4l3u.onrender.com'}${res.data.data.url}`;
           setFormData((prev) => ({ ...prev, images: [...prev.images, imageUrl] }));
           toast.success(`Uploaded: ${file.name}`);
         }

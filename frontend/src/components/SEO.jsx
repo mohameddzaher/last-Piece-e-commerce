@@ -56,8 +56,8 @@ export default function SEO({
       <link rel="manifest" href="/site.webmanifest" />
 
       {/* Preconnect to external domains */}
-      <link rel="preconnect" href={process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'} />
-      <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'} />
+      <link rel="preconnect" href={process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://last-piece-4l3u.onrender.com'} />
+      <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://last-piece-4l3u.onrender.com'} />
 
       {/* Structured Data - Organization */}
       <script

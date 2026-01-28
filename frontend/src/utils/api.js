@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+// الحقيقي = Render. للعمل على باك اند لوكال: ضع NEXT_PUBLIC_API_URL=http://localhost:5001/api في .env.local
+const PRODUCTION_API = 'https://last-piece-4l3u.onrender.com/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || PRODUCTION_API;
 
 const apiClient = axios.create({
   baseURL: API_URL,
