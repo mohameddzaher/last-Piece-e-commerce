@@ -9,12 +9,17 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const getConnectionStrings = () => {
   const strings = [];
 
-  // Try local MongoDB first (faster in dev)
-  strings.push('mongodb://127.0.0.1:27017/lastpiece');
-
-  // Then try Atlas if configured
-  if (process.env.MONGODB_URI) {
-    strings.push(process.env.MONGODB_URI);
+  // In production, use Atlas directly
+  if (process.env.NODE_ENV === 'production') {
+    if (process.env.MONGODB_URI) {
+      strings.push(process.env.MONGODB_URI);
+    }
+  } else {
+    // In development, try local first, then Atlas
+    strings.push('mongodb://127.0.0.1:27017/lastpiece');
+    if (process.env.MONGODB_URI) {
+      strings.push(process.env.MONGODB_URI);
+    }
   }
 
   return strings;
