@@ -40,7 +40,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:', 'http:'],
-      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3001'],
+      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3001', 'https://last-piece.netlify.app'],
       fontSrc: ["'self'", 'data:'],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
@@ -54,11 +54,22 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration - allow all origins in development
+// CORS: في الإنتاج اقبل Netlify + FRONTEND_URL + لوكال. على Render ضع FRONTEND_URL=https://last-piece.netlify.app
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://last-piece.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:3001',
+].filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'development'
-    ? true // Allow all origins in development
-    : process.env.FRONTEND_URL || 'http://localhost:3001',
+  origin:
+    process.env.NODE_ENV === 'development'
+      ? true
+      : (origin, cb) => {
+          if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+          else cb(null, false);
+        },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
