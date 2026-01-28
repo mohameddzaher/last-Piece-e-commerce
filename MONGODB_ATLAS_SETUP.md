@@ -1,5 +1,17 @@
 # 🗄️ MongoDB Atlas Setup Guide
 
+## ⚠️ لو ظهرلك على Render: "Could not connect to any servers... IP whitelist"
+
+**السبب**: Render بيشتغل من IPs متغيرة، و Mongo Atlas مش مسموح ليهم بالدخول.
+
+**الحل السريع**:
+1. روح [MongoDB Atlas](https://cloud.mongodb.com) → مشروعك → **Network Access**
+2. اضغط **ADD IP ADDRESS**
+3. اختر **ALLOW ACCESS FROM ANYWHERE** (أو اكتب `0.0.0.0/0` يدوي)
+4. اضغط **Confirm** وانتظر دقيقتين، بعدين اعمل **Redeploy** للـ Service على Render
+
+---
+
 ## خطوات ضبط MongoDB Atlas للـ Backend على Render
 
 ### الخطوة 1: إعداد MongoDB Atlas
