@@ -28,8 +28,16 @@ dotenv.config();
 // Initialize app
 const app = express();
 
-// Connect to database
-connectDB();
+// Trust proxy for Render (required for rate limiter and correct IP detection)
+app.set('trust proxy', 1);
+
+// Connect to database (non-blocking - server will start even if DB fails)
+connectDB().catch((err) => {
+  console.error('Database connection failed:', err.message);
+  if (process.env.NODE_ENV === 'production') {
+    console.error('⚠️  Server will continue but API endpoints may fail without database');
+  }
+});
 
 // Security middleware - Enhanced
 app.use(helmet({

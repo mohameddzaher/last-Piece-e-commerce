@@ -86,15 +86,19 @@ export const connectDB = async (uriIndex = 0, retryCount = 0) => {
     // All options exhausted
     console.error('\n⚠️  Could not connect to any MongoDB database.');
     console.error('Please ensure either:');
-    console.error('  1. Your IP is whitelisted in MongoDB Atlas');
-    console.error('  2. Local MongoDB is running (brew services start mongodb-community)');
+    console.error('  1. MONGODB_URI is set correctly in environment variables');
+    console.error('  2. Your IP is whitelisted in MongoDB Atlas (use 0.0.0.0/0 for Render)');
+    console.error('  3. MongoDB Atlas cluster is running and accessible');
 
     if (process.env.NODE_ENV === 'development') {
       console.log('\n🔧 Running in development mode without database...');
       return null;
     }
 
-    process.exit(1);
+    // In production, don't crash - let server start but log error
+    console.error('\n⚠️  Server will start but API endpoints will fail without database connection.');
+    console.error('Check MONGODB_URI in Render environment variables.');
+    return null;
   }
 };
 
