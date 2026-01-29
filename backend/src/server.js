@@ -28,16 +28,8 @@ dotenv.config();
 // Initialize app
 const app = express();
 
-// Trust proxy for Render (required for rate limiter and correct IP detection)
-app.set('trust proxy', 1);
-
-// Connect to database (non-blocking - server will start even if DB fails)
-connectDB().catch((err) => {
-  console.error('Database connection failed:', err.message);
-  if (process.env.NODE_ENV === 'production') {
-    console.error('⚠️  Server will continue but API endpoints may fail without database');
-  }
-});
+// Connect to database
+connectDB();
 
 // Security middleware - Enhanced
 app.use(helmet({
@@ -48,7 +40,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:', 'http:'],
-      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3001', 'https://last-piece.netlify.app'],
+      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3001'],
       fontSrc: ["'self'", 'data:'],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
@@ -62,22 +54,11 @@ app.use(helmet({
   },
 }));
 
-// CORS: allow Netlify, FRONTEND_URL, and localhost. Set FRONTEND_URL=https://last-piece.netlify.app on Render
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'https://last-piece.netlify.app',
-  'http://localhost:3000',
-  'http://localhost:3001',
-].filter(Boolean);
-
+// CORS configuration - allow all origins in development
 const corsOptions = {
-  origin:
-    process.env.NODE_ENV === 'development'
-      ? true
-      : (origin, cb) => {
-          if (!origin || allowedOrigins.includes(origin)) cb(null, true);
-          else cb(null, false);
-        },
+  origin: process.env.NODE_ENV === 'development'
+    ? true // Allow all origins in development
+    : process.env.FRONTEND_URL || 'http://localhost:3001',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

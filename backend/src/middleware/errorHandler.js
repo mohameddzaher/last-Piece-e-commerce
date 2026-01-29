@@ -1,17 +1,5 @@
 export const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err.message);
-  if (process.env.NODE_ENV === 'development') {
-    console.error(err.stack);
-  }
-
-  // Handle MongoDB connection errors
-  if (err.name === 'MongoServerError' || err.name === 'MongooseError' || err.message?.includes('buffering timed out') || err.message?.includes('not connected')) {
-    return res.status(503).json({
-      success: false,
-      message: 'Database connection unavailable. Please check MongoDB configuration.',
-      error: 'Database not connected',
-    });
-  }
+  console.error(err.stack);
 
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';

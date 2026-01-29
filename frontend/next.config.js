@@ -7,19 +7,19 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '**',
+        protocol: "https",
+        hostname: "**",
       },
       {
-        protocol: 'http',
-        hostname: 'localhost',
+        protocol: "http",
+        hostname: "localhost",
       },
       {
-        protocol: 'http',
-        hostname: '127.0.0.1',
+        protocol: "http",
+        hostname: "127.0.0.1",
       },
     ],
-    formats: ['image/avif', 'image/webp'],
+    formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -28,35 +28,35 @@ const nextConfig = {
   // Enhanced security headers
   headers: async () => [
     {
-      source: '/:path*',
+      source: "/:path*",
       headers: [
         {
-          key: 'X-DNS-Prefetch-Control',
-          value: 'on',
+          key: "X-DNS-Prefetch-Control",
+          value: "on",
         },
         {
-          key: 'Strict-Transport-Security',
-          value: 'max-age=63072000; includeSubDomains; preload',
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
         },
         {
-          key: 'X-Content-Type-Options',
-          value: 'nosniff',
+          key: "X-Content-Type-Options",
+          value: "nosniff",
         },
         {
-          key: 'X-Frame-Options',
-          value: 'SAMEORIGIN',
+          key: "X-Frame-Options",
+          value: "SAMEORIGIN",
         },
         {
-          key: 'X-XSS-Protection',
-          value: '1; mode=block',
+          key: "X-XSS-Protection",
+          value: "1; mode=block",
         },
         {
-          key: 'Referrer-Policy',
-          value: 'origin-when-cross-origin',
+          key: "Referrer-Policy",
+          value: "origin-when-cross-origin",
         },
         {
-          key: 'Permissions-Policy',
-          value: 'camera=(), microphone=(), geolocation=(), payment=(self)',
+          key: "Permissions-Policy",
+          value: "camera=(), microphone=(), geolocation=(), payment=(self)",
         },
       ],
     },
@@ -67,27 +67,30 @@ const nextConfig = {
 
   // Performance optimizations
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn'],
-    } : false,
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? {
+            exclude: ["error", "warn"],
+          }
+        : false,
   },
 
   // Webpack optimizations
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization.splitChunks = {
-        chunks: 'all',
+        chunks: "all",
         cacheGroups: {
           default: false,
           vendors: false,
           commons: {
-            name: 'commons',
-            chunks: 'all',
+            name: "commons",
+            chunks: "all",
             minChunks: 2,
           },
           react: {
-            name: 'react',
-            chunks: 'all',
+            name: "react",
+            chunks: "all",
             test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
           },
         },
@@ -99,6 +102,13 @@ const nextConfig = {
   rewrites: async () => ({
     beforeFiles: [],
   }),
+
+  // Serve SVG favicon for /favicon.ico to avoid 404
+  async redirects() {
+    return [
+      { source: "/favicon.ico", destination: "/favicon.svg", permanent: false },
+    ];
+  },
 };
 
 module.exports = nextConfig;
