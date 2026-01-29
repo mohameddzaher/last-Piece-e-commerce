@@ -1,17 +1,15 @@
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 export const generateTokens = (userId, role) => {
-  const accessToken = jwt.sign(
-    { id: userId, role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
-  );
+  const accessToken = jwt.sign({ id: userId, role }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || "7d",
+  });
 
   const refreshToken = jwt.sign(
     { id: userId, role },
     process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d' }
+    { expiresIn: process.env.JWT_REFRESH_EXPIRE || "30d" },
   );
 
   return { accessToken, refreshToken };
@@ -25,13 +23,45 @@ export const verifyToken = (token, secret) => {
   }
 };
 
+/** Resolve relative image URLs to full backend URL (for Render/local). Use BACKEND_PUBLIC_URL e.g. https://last-piece-4l3u.onrender.com */
+export const resolveImageUrl = (url) => {
+  if (!url || typeof url !== "string") return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const base = (process.env.BACKEND_PUBLIC_URL || "")
+    .replace(/\/api\/?$/, "")
+    .replace(/\/$/, "");
+  return base ? `${base}${url.startsWith("/") ? url : "/" + url}` : url;
+};
+
+/** Apply resolveImageUrl to product images and thumbnail. */
+export const resolveProductImageUrls = (product) => {
+  if (!product) return product;
+  const resolved = product.toObject ? product.toObject() : { ...product };
+  if (resolved.images && Array.isArray(resolved.images)) {
+    resolved.images = resolved.images.map((img) =>
+      typeof img === "string"
+        ? { url: resolveImageUrl(img), alt: "" }
+        : { ...img, url: resolveImageUrl(img.url) },
+    );
+  }
+  if (resolved.thumbnail)
+    resolved.thumbnail = resolveImageUrl(resolved.thumbnail);
+  return resolved;
+};
+
+/** Resolve image URLs for an array of products. */
+export const resolveProductsImageUrls = (products) => {
+  if (!Array.isArray(products)) return products;
+  return products.map((p) => resolveProductImageUrls(p));
+};
+
 export const generateSlug = (text) => {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 };
 
 export const generateSKU = (categoryName, productName) => {
@@ -47,11 +77,11 @@ export const generateOrderNumber = () => {
 };
 
 export const generateVerificationToken = () => {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 };
 
 export const hashToken = (token) => {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return crypto.createHash("sha256").update(token).digest("hex");
 };
 
 export const calculatePagination = (page = 1, limit = 10) => {

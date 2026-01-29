@@ -1,14 +1,28 @@
-import Product from '../models/Product.js';
-import Category from '../models/Category.js';
-import { generateSlug, calculatePagination, generateSKU } from '../utils/helpers.js';
+import Product from "../models/Product.js";
+import Category from "../models/Category.js";
+import {
+  generateSlug,
+  calculatePagination,
+  generateSKU,
+  resolveProductImageUrls,
+  resolveProductsImageUrls,
+} from "../utils/helpers.js";
 
 export const getAllProducts = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, category, search, sort = '-createdAt', minPrice, maxPrice } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      category,
+      search,
+      sort = "-createdAt",
+      minPrice,
+      maxPrice,
+    } = req.query;
     const { skip, limit: pageLimit } = calculatePagination(page, limit);
 
     // Include both active and draft products (draft is default for new products)
-    let filter = { status: { $in: ['active', 'draft'] } };
+    let filter = { status: { $in: ["active", "draft"] } };
 
     if (category) {
       // Check if category is an ObjectId or a name/slug
@@ -18,8 +32,8 @@ export const getAllProducts = async (req, res, next) => {
         // Find category by name or slug (case-insensitive)
         const categoryDoc = await Category.findOne({
           $or: [
-            { name: { $regex: new RegExp(`^${category}$`, 'i') } },
-            { slug: category.toLowerCase().replace(/\s+/g, '-') },
+            { name: { $regex: new RegExp(`^${category}$`, "i") } },
+            { slug: category.toLowerCase().replace(/\s+/g, "-") },
           ],
         });
         if (categoryDoc) {
@@ -43,8 +57,8 @@ export const getAllProducts = async (req, res, next) => {
     if (search) {
       // Use regex for partial matching from first character
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -55,16 +69,17 @@ export const getAllProducts = async (req, res, next) => {
     }
 
     const products = await Product.find(filter)
-      .populate('category')
+      .populate("category")
       .sort(sort)
       .skip(skip)
       .limit(pageLimit);
 
     const total = await Product.countDocuments(filter);
 
+    const data = resolveProductsImageUrls(products);
     res.status(200).json({
       success: true,
-      data: products,
+      data,
       pagination: {
         total,
         pages: Math.ceil(total / pageLimit),
@@ -84,17 +99,21 @@ export const getProductBySlug = async (req, res, next) => {
     // Also try to find by ID if slug looks like an ObjectId
     let product;
     if (slug.match(/^[0-9a-fA-F]{24}$/)) {
-      product = await Product.findOne({ _id: slug, status: { $in: ['active', 'draft'] } })
-        .populate('category');
+      product = await Product.findOne({
+        _id: slug,
+        status: { $in: ["active", "draft"] },
+      }).populate("category");
     } else {
-      product = await Product.findOne({ slug, status: { $in: ['active', 'draft'] } })
-        .populate('category');
+      product = await Product.findOne({
+        slug,
+        status: { $in: ["active", "draft"] },
+      }).populate("category");
     }
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found',
+        message: "Product not found",
       });
     }
 
@@ -104,7 +123,7 @@ export const getProductBySlug = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: product,
+      data: resolveProductImageUrls(product),
     });
   } catch (error) {
     next(error);
@@ -137,7 +156,7 @@ export const createProduct = async (req, res, next) => {
     if (!name || !description || !price || !category) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields',
+        message: "Missing required fields",
       });
     }
 
@@ -146,7 +165,7 @@ export const createProduct = async (req, res, next) => {
     if (productExists) {
       return res.status(409).json({
         success: false,
-        message: 'Product with this name already exists',
+        message: "Product with this name already exists",
       });
     }
 
@@ -174,13 +193,13 @@ export const createProduct = async (req, res, next) => {
       promotion,
       seo,
       createdBy: req.user.id,
-      status: 'draft',
+      status: "draft",
     });
 
     res.status(201).json({
       success: true,
-      message: 'Product created successfully',
-      data: product,
+      message: "Product created successfully",
+      data: resolveProductImageUrls(product),
     });
   } catch (error) {
     next(error);
@@ -194,20 +213,20 @@ export const updateProduct = async (req, res, next) => {
     const product = await Product.findByIdAndUpdate(
       id,
       { ...req.body, updatedBy: req.user.id },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found',
+        message: "Product not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Product updated successfully',
-      data: product,
+      message: "Product updated successfully",
+      data: resolveProductImageUrls(product),
     });
   } catch (error) {
     next(error);
@@ -220,20 +239,20 @@ export const deleteProduct = async (req, res, next) => {
 
     const product = await Product.findByIdAndUpdate(
       id,
-      { status: 'discontinued' },
-      { new: true }
+      { status: "discontinued" },
+      { new: true },
     );
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found',
+        message: "Product not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Product deleted successfully',
+      message: "Product deleted successfully",
     });
   } catch (error) {
     next(error);
@@ -254,17 +273,16 @@ export const searchProducts = async (req, res, next) => {
     // Use regex for partial matching from first character
     const products = await Product.find({
       $or: [
-        { name: { $regex: query, $options: 'i' } },
-        { description: { $regex: query, $options: 'i' } },
-        { brand: { $regex: query, $options: 'i' } },
+        { name: { $regex: query, $options: "i" } },
+        { description: { $regex: query, $options: "i" } },
+        { brand: { $regex: query, $options: "i" } },
       ],
-      status: { $in: ['active', 'draft'] },
-    })
-      .limit(parseInt(limit));
+      status: { $in: ["active", "draft"] },
+    }).limit(parseInt(limit));
 
     res.status(200).json({
       success: true,
-      data: products,
+      data: resolveProductsImageUrls(products),
     });
   } catch (error) {
     next(error);
@@ -280,20 +298,19 @@ export const getRelatedProducts = async (req, res, next) => {
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found',
+        message: "Product not found",
       });
     }
 
     const relatedProducts = await Product.find({
       $or: [{ category: product.category }, { tags: { $in: product.tags } }],
       _id: { $ne: id },
-      status: { $in: ['active', 'draft'] },
-    })
-      .limit(parseInt(limit));
+      status: { $in: ["active", "draft"] },
+    }).limit(parseInt(limit));
 
     res.status(200).json({
       success: true,
-      data: relatedProducts,
+      data: resolveProductsImageUrls(relatedProducts),
     });
   } catch (error) {
     next(error);

@@ -6,3 +6,4 @@ REFRESH_TOKEN_SECRET=your-super-secret-refresh-token-secret-min-32-characters-lo
 JWT_EXPIRE=7d
 JWT_REFRESH_EXPIRE=30d
 FRONTEND_URL=https://last-piece.netlify.app
+BACKEND_PUBLIC_URL=https://last-piece-4l3u.onrender.com
