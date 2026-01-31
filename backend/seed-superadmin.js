@@ -23,7 +23,7 @@ const SUPER_ADMIN = {
 
 async function seedSuperAdmin() {
   try {
-    const mongoUri = 'mongodb://127.0.0.1:27017/lastpiece';
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/lastpiece';
     await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB');
 

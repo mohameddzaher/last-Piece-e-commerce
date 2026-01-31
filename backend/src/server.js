@@ -54,11 +54,24 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration - allow all origins in development
+// CORS configuration - allow frontend URLs
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'https://last-piece.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:3001',
+];
+
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'development'
-    ? true // Allow all origins in development
-    : process.env.FRONTEND_URL || 'http://localhost:3001',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

@@ -113,17 +113,18 @@ export default function EditProduct() {
     }
   };
 
+  const [imageUrlInput, setImageUrlInput] = useState("");
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleImageUrl = (e) => {
-    e.preventDefault();
-    const url = e.target.imageUrl.value.trim();
+  const handleAddImageUrl = () => {
+    const url = imageUrlInput.trim();
     if (url && !formData.images.includes(url)) {
       setFormData((prev) => ({ ...prev, images: [...prev.images, url] }));
-      e.target.imageUrl.value = "";
+      setImageUrlInput("");
     }
   };
 
@@ -600,21 +601,29 @@ export default function EditProduct() {
                       stored permanently. Use image URLs from Imgur, Cloudinary,
                       or your own hosting so images persist after refresh.
                     </p>
-                    <form onSubmit={handleImageUrl} className="flex gap-4 mb-6">
+                    <div className="flex gap-4 mb-6">
                       <input
                         type="url"
-                        name="imageUrl"
+                        value={imageUrlInput}
+                        onChange={(e) => setImageUrlInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddImageUrl();
+                          }
+                        }}
                         className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="https://example.com/image.jpg"
                       />
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={handleAddImageUrl}
                         className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
                       >
                         <FiPlus size={18} />
                         Add
                       </button>
-                    </form>
+                    </div>
                   </>
                 )}
 
