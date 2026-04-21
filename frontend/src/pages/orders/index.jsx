@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   FiPackage,
@@ -184,15 +185,17 @@ export default function Orders() {
                             {order.items?.slice(0, 3).map((item, idx) => (
                               <div
                                 key={idx}
-                                className="w-10 h-10 bg-slate-800 rounded-lg border-2 border-slate-900 overflow-hidden"
+                                className="relative w-10 h-10 bg-slate-800 rounded-lg border-2 border-slate-900 overflow-hidden"
                               >
                                 {item.product?.thumbnail ? (
-                                  <img
+                                  <Image
                                     src={getProductImageUrl(
                                       item.product.thumbnail,
                                     )}
                                     alt=""
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    sizes="40px"
+                                    className="object-cover"
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-gray-600">

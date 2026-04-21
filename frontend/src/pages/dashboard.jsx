@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   FiUser,
@@ -307,14 +308,16 @@ export default function Dashboard() {
                           className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg"
                         >
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-slate-700 rounded-lg overflow-hidden">
+                            <div className="relative w-12 h-12 bg-slate-700 rounded-lg overflow-hidden">
                               {order.items?.[0]?.product?.thumbnail ? (
-                                <img
+                                <Image
                                   src={getProductImageUrl(
                                     order.items[0].product.thumbnail,
                                   )}
                                   alt=""
-                                  className="w-full h-full object-cover"
+                                  fill
+                                  sizes="48px"
+                                  className="object-cover"
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-500">
@@ -497,12 +500,14 @@ export default function Dashboard() {
                         key={item.productId}
                         className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-lg"
                       >
-                        <div className="w-20 h-20 bg-slate-700 rounded-lg overflow-hidden">
+                        <div className="relative w-20 h-20 bg-slate-700 rounded-lg overflow-hidden">
                           {item.product?.thumbnail ? (
-                            <img
+                            <Image
                               src={getProductImageUrl(item.product.thumbnail)}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover"
+                              alt={item.product.name || ''}
+                              fill
+                              sizes="80px"
+                              className="object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-500">
@@ -651,12 +656,14 @@ export default function Dashboard() {
                         href={`/products/${item.product?.slug || item.productId}`}
                         className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors"
                       >
-                        <div className="w-16 h-16 bg-slate-700 rounded-lg overflow-hidden">
+                        <div className="relative w-16 h-16 bg-slate-700 rounded-lg overflow-hidden">
                           {item.product?.thumbnail ? (
-                            <img
+                            <Image
                               src={getProductImageUrl(item.product.thumbnail)}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover"
+                              alt={item.product.name || ''}
+                              fill
+                              sizes="64px"
+                              className="object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-500">

@@ -13,16 +13,17 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans), 'Inter', system-ui, sans-serif;
   background-color: #ffffff;
   color: #1f2937;
   line-height: 1.6;
 }
 
-/* RTL / Arabic font stack */
+/* RTL / Arabic font stack — resolved from next/font CSS variables so Arabic
+   renders in Tajawal without another blocking request. */
 html[dir='rtl'],
 body.font-arabic {
-  font-family: 'Tajawal', 'Cairo', 'Segoe UI', 'Inter', system-ui, sans-serif;
+  font-family: var(--font-arabic), 'Tajawal', 'Segoe UI', var(--font-sans), system-ui, sans-serif;
 }
 
 html[dir='rtl'] .ltr-only {
@@ -61,7 +62,7 @@ body.font-arabic h3,
 body.font-arabic h4,
 body.font-arabic h5,
 body.font-arabic h6 {
-  font-family: 'Cairo', 'Tajawal', 'Inter', system-ui, sans-serif;
+  font-family: var(--font-arabic-heading), 'Cairo', var(--font-arabic), 'Tajawal', var(--font-sans), system-ui, sans-serif;
 }
 
 /* Hide scrollbar on horizontal scroll tabs */

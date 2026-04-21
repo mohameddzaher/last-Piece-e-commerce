@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   FiArrowLeft, FiPackage, FiTruck, FiCheckCircle, FiXCircle,
   FiMapPin, FiPhone, FiCreditCard, FiClock,
@@ -202,12 +203,14 @@ export default function OrderDetail() {
               <ul className="divide-y divide-slate-100">
                 {(order.items || []).map((it, i) => (
                   <li key={i} className="p-3 flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
+                    <div className="relative w-14 h-14 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
                       {it.productId?.thumbnail || it.thumbnail ? (
-                        <img
+                        <Image
                           src={getProductImageUrl(it.productId?.thumbnail || it.thumbnail)}
-                          alt={it.productName}
-                          className="w-full h-full object-cover"
+                          alt={it.productName || ''}
+                          fill
+                          sizes="56px"
+                          className="object-cover"
                         />
                       ) : (
                         <FiPackage className="text-slate-300" size={18} />

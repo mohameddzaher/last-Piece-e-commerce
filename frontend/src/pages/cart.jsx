@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiArrowRight, FiTag, FiX } from 'react-icons/fi';
@@ -158,9 +159,9 @@ export default function Cart() {
                     <div className='flex gap-4'>
                       {/* Image */}
                       <Link href={`/products/${item.productId}`} className='flex-shrink-0'>
-                        <div className='w-24 h-24 bg-slate-800 rounded-lg overflow-hidden'>
+                        <div className='relative w-24 h-24 bg-slate-800 rounded-lg overflow-hidden'>
                           {item.image ? (
-                            <img src={item.image} alt={item.name} className='w-full h-full object-cover' />
+                            <Image src={item.image} alt={item.name} fill sizes='96px' className='object-cover' />
                           ) : (
                             <div className='w-full h-full flex items-center justify-center text-gray-600'>
                               <FiShoppingBag size={24} />

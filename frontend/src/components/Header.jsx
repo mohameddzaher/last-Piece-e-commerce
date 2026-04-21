@@ -33,8 +33,11 @@ export default function Header() {
   const toggleLang = () => setLanguage(lang === 'en' ? 'ar' : 'en');
 
   useEffect(() => {
+    // Passive listener so the browser can keep the scroll thread smooth — this
+    // matters on mobile, where a non-passive scroll handler can stall the
+    // compositor for a frame on every scroll tick.
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 

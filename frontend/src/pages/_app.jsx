@@ -3,6 +3,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useEffect, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { Inter, Tajawal, Cairo } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import RouteProgress from "@/components/RouteProgress";
@@ -11,6 +12,35 @@ import { useAuthStore, useCartStore, useWishlistStore } from "@/store";
 import { cartAPI, wishlistAPI, authAPI } from "@/utils/endpoints";
 import { useI18n } from "@/utils/i18n";
 import { getSocket, reconnectSocket } from "@/utils/socket";
+
+// next/font self-hosts the fonts at build time, preloads the files on the
+// initial HTML, and exposes them as CSS variables. This removes the blocking
+// request to fonts.googleapis.com and gets rid of the FOIT that used to show
+// Times New Roman for a beat on slow connections.
+// `display: swap` lets the browser render with fallback glyphs first.
+// `preload: false` on the non-primary fonts keeps the critical path small.
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
+const tajawal = Tajawal({
+  subsets: ["arabic"],
+  weight: ["400", "500", "700", "800"],
+  display: "swap",
+  variable: "--font-arabic",
+  preload: false,
+});
+
+const cairo = Cairo({
+  subsets: ["arabic"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-arabic-heading",
+  preload: false,
+});
 
 // Client-only wrapper: useRouter must not run during SSG/prerender.
 // This component is only rendered after mount, so router is available.
@@ -152,14 +182,10 @@ function MyApp({ Component, pageProps }) {
           name="description"
           content="Last Piece — Khaleeji luxury sneakers. Authentic, limited, one-of-a-kind."
         />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&family=Cairo:wght@300;400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
       </Head>
-      <AppContent Component={Component} pageProps={pageProps} />
+      <div className={`${inter.variable} ${tajawal.variable} ${cairo.variable}`}>
+        <AppContent Component={Component} pageProps={pageProps} />
+      </div>
     </>
   );
 }

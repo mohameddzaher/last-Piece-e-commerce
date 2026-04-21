@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FiHeart, FiShoppingCart } from 'react-icons/fi';
@@ -10,7 +11,7 @@ import { getProductImageUrl } from '@/utils/formatters';
 import { fmtMoney } from '@/utils/format';
 import { useI18n } from '@/utils/i18n';
 
-export default function ProductCard({ product, variant = 'light' }) {
+function ProductCard({ product, variant = 'light' }) {
   const t = useI18n((s) => s.t);
   const { addItem } = useCartStore();
   const {
@@ -165,3 +166,16 @@ export default function ProductCard({ product, variant = 'light' }) {
     </Link>
   );
 }
+
+// Memoized so the 20+ cards on the products listing don't re-render every time
+// an unrelated store slice changes (cart itemCount, auth state, etc.). The
+// Zustand selectors inside the component are already fine-grained, but React
+// still runs the render function on parent updates — memo skips that.
+export default memo(ProductCard, (prev, next) =>
+  prev.variant === next.variant &&
+  prev.product?._id === next.product?._id &&
+  prev.product?.price === next.product?.price &&
+  prev.product?.location === next.product?.location &&
+  prev.product?.stock === next.product?.stock &&
+  prev.product?.thumbnail === next.product?.thumbnail,
+);
