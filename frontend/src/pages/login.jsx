@@ -3,10 +3,21 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight, FiCopy } from 'react-icons/fi';
 import { authAPI } from '@/utils/endpoints';
 import { useAuthStore } from '@/store';
 import { toast } from 'react-toastify';
+
+// TEMPORARY — team accounts shown on the login screen while we're still in
+// the QA/testing phase so the user doesn't have to remember 4 passwords while
+// switching roles. REMOVE THIS BLOCK (and its JSX usage below) before public
+// launch. Passwords match what backend/seed-fresh.js creates.
+const TEST_ACCOUNTS = [
+  { label: 'Mohamed · super-admin', email: 'mohamed@lastpiece.com', password: 'Founder@2026' },
+  { label: 'Sameh · super-admin',   email: 'sameh@lastpiece.com',   password: 'Founder@2026' },
+  { label: 'Asmaa · saudi-staff',   email: 'asmaa@lastpiece.com',   password: 'Asmaa@2026' },
+  { label: 'Islam · egypt-staff',   email: 'islam@lastpiece.com',   password: 'Islam@2026' },
+];
 
 export default function Login() {
   const router = useRouter();
@@ -144,6 +155,32 @@ export default function Login() {
             <div className='flex-1 h-px bg-slate-800'></div>
             <span className='text-xs text-gray-500'>or</span>
             <div className='flex-1 h-px bg-slate-800'></div>
+          </div>
+
+          {/* TEMP — test accounts. Removed before public launch. */}
+          <div className='mb-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3'>
+            <div className='flex items-center justify-between mb-2'>
+              <span className='text-[10px] font-bold uppercase tracking-widest text-amber-300'>
+                Test accounts (QA only)
+              </span>
+              <span className='text-[9px] text-amber-300/60'>tap to autofill</span>
+            </div>
+            <div className='space-y-1.5'>
+              {TEST_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type='button'
+                  onClick={() => setFormData({ email: acc.email, password: acc.password })}
+                  className='w-full group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-left transition-colors'
+                >
+                  <div className='min-w-0'>
+                    <div className='text-[11px] font-semibold text-white truncate'>{acc.label}</div>
+                    <div className='text-[10px] text-gray-400 font-mono truncate'>{acc.email}</div>
+                  </div>
+                  <FiCopy size={10} className='shrink-0 text-gray-500 group-hover:text-amber-300' />
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Sign Up Link */}
