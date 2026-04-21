@@ -79,6 +79,7 @@ export default function AdminExpenses() {
   return (
     <AdminLayout
       title="Operating Expenses"
+      requiredRoles={['super-admin', 'admin']}
       actions={
         <button onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded-md hover:bg-blue-600">
           <FiPlus size={12} /> New Expense

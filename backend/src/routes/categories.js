@@ -1,5 +1,6 @@
 import express from "express";
 import Category from "../models/Category.js";
+import Product from "../models/Product.js";
 import { generateSlug } from "../utils/helpers.js";
 import { protect, authorize } from "../middleware/auth.js";
 import { requireDB } from "../middleware/dbCheck.js";
@@ -9,7 +10,20 @@ const router = express.Router();
 // Get all categories (public)
 router.get("/", requireDB, async (req, res, next) => {
   try {
-    const categories = await Category.find({ isActive: true }).sort("order");
+    const [categoryDocs, counts] = await Promise.all([
+      Category.find({ isActive: true }).sort("order").lean(),
+      // B-15: live product count per category so the public category grid
+      // reflects reality without a manual refresh step.
+      Product.aggregate([
+        { $match: { status: "active", location: { $in: ["egypt-online", "egypt-both"] } } },
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+      ]),
+    ]);
+    const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+    const categories = categoryDocs.map((c) => ({
+      ...c,
+      productCount: countMap.get(String(c._id)) || 0,
+    }));
     res.status(200).json({
       success: true,
       data: categories,

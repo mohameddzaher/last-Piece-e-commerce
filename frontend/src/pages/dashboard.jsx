@@ -324,7 +324,7 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <p className="font-medium text-white">
-                                Order #{order.orderNumber}
+                                Order <span className="font-mono">#{order.orderNumber}</span>
                               </p>
                               <p className="text-sm text-gray-400">
                                 {new Date(order.createdAt).toLocaleDateString()}
@@ -433,7 +433,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between mb-3">
                           <div>
                             <p className="font-medium text-white">
-                              Order #{order.orderNumber}
+                              Order <span className="font-mono">#{order.orderNumber}</span>
                             </p>
                             <p className="text-sm text-gray-400">
                               {new Date(order.createdAt).toLocaleDateString(

@@ -7,7 +7,7 @@ import { fmtDate } from '@/utils/format';
 export default function AdminSettings() {
   const { user } = useAuthStore();
   return (
-    <AdminLayout title="Settings">
+    <AdminLayout title="Settings" requiredRoles={['super-admin']}>
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
         <section>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Your profile</h3>

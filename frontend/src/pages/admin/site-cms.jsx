@@ -39,7 +39,7 @@ export default function AdminSiteCMS() {
   }, {});
 
   return (
-    <AdminLayout title="Site Content (CMS)">
+    <AdminLayout title="Site Content (CMS)" requiredRoles={['super-admin', 'admin']}>
       <p className="text-xs text-slate-500 mb-4">
         Every text and image on the public site lives here. Changes go live instantly for visitors.
       </p>

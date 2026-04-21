@@ -31,9 +31,12 @@ const buildLocationFilter = (role) => {
     case "egypt-staff":
       return { location: { $in: ["egypt-online", "egypt-offline", "egypt-both"] } };
     default:
+      // Public — only active, online-available pairs. Reject anything with no
+      // selling price (would render as "EGP 0" on the storefront).
       return {
         location: { $in: ["egypt-online", "egypt-both"] },
         status: "active",
+        price: { $gt: 0 },
       };
   }
 };

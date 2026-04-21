@@ -9,6 +9,7 @@ import { connectDB } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { initSocket } from './realtime/io.js';
+import { ensureFxDefaults } from './utils/ensureFxDefaults.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,8 +39,11 @@ dotenv.config();
 // Initialize app
 const app = express();
 
-// Connect to database
-connectDB();
+// Connect to database, then seed FX defaults so the admin Dashboard's rate
+// cards (SAR, USD, EUR) aren't blank on a fresh deploy.
+connectDB().then((conn) => {
+  if (conn) ensureFxDefaults();
+});
 
 // Security middleware - Enhanced
 app.use(helmet({

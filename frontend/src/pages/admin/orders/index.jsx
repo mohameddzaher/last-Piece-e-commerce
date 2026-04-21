@@ -56,7 +56,7 @@ export default function AdminOrders() {
   ];
 
   return (
-    <AdminLayout title="Online Orders">
+    <AdminLayout title="Online Orders" requiredRoles={['super-admin', 'admin']}>
       <DataTable
         columns={columns}
         rows={rows}

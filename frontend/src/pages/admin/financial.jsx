@@ -4,29 +4,31 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import StatCard from '@/components/admin/StatCard';
 import DataTable from '@/components/admin/DataTable';
-import { expenseAPI, saleAPI, adminAPI } from '@/utils/endpoints';
+import { expenseAPI, saleAPI, adminAPI, fxAPI } from '@/utils/endpoints';
 import { useSocketEvent } from '@/utils/socket';
 import { fmtMoney, fmtPct, fmtDate } from '@/utils/format';
 import { FiTrendingUp, FiDollarSign, FiPackage, FiAlertTriangle } from 'react-icons/fi';
-
-const toEGP = (amt, cur) => (cur === 'SAR' ? amt * 8.3 : cur === 'USD' ? amt * 48 : amt || 0);
+import { toEGP, ratesFromReferences } from '@/utils/fxConvert';
 
 export default function AdminFinancial() {
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [fxRates, setFxRates] = useState({ EGP: 1 });
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     try {
-      const [s, e, o] = await Promise.all([
+      const [s, e, o, fx] = await Promise.all([
         saleAPI.getAll({ limit: 2000 }).catch(() => ({ data: { data: [] } })),
         expenseAPI.getAll({ limit: 2000 }).catch(() => ({ data: { data: [] } })),
         adminAPI.getOrders({ limit: 2000 }).catch(() => ({ data: { data: [] } })),
+        fxAPI.getReferences().catch(() => ({ data: { data: [] } })),
       ]);
       setSales(s.data.data || []);
       setExpenses(e.data.data || []);
       setOrders(o.data.data || []);
+      setFxRates(ratesFromReferences(fx.data?.data || []));
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -36,17 +38,19 @@ export default function AdminFinancial() {
   useSocketEvent('order:created', load);
 
   const offlineRevenue = sales.reduce((s, x) => s + (x.total || 0), 0);
-  const onlineRevenue = orders.filter((o) => o.payment?.status === 'completed').reduce((s, x) => s + (x.pricing?.total || 0), 0);
+  // Align with the Dashboard — only actually-paid orders count as revenue.
+  const paidOrders = orders.filter((o) => ['completed', 'delivered'].includes(o.payment?.status) || ['delivered'].includes(o.status));
+  const onlineRevenue = paidOrders.reduce((s, x) => s + (x.pricing?.total || 0), 0);
   const revenue = offlineRevenue + onlineRevenue;
   const cogs = sales.reduce((s, x) => s + (x.totalCost || 0), 0);
   const grossProfit = sales.reduce((s, x) => s + (x.totalProfit || 0), 0);
-  const opex = expenses.reduce((s, x) => s + toEGP(x.amount, x.currency), 0);
+  const opex = expenses.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP', fxRates), 0);
   const net = grossProfit - opex;
   const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
   // Expenses breakdown
   const byCategory = expenses.reduce((acc, x) => {
-    const v = toEGP(x.amount, x.currency);
+    const v = toEGP(x.amount || 0, x.currency || 'EGP', fxRates);
     acc[x.category] = (acc[x.category] || 0) + v;
     return acc;
   }, {});
@@ -55,7 +59,7 @@ export default function AdminFinancial() {
     .sort((a, b) => b.amount - a.amount);
 
   return (
-    <AdminLayout title="Financial Report">
+    <AdminLayout title="Financial Report" requiredRoles={['super-admin']}>
       <p className="text-xs text-slate-500 mb-6">
         Live P&L. Gross profit covers sold inventory; operating expenses track your overhead (salaries, rent, marketing) separately — the way you asked.
       </p>

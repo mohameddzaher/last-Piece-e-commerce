@@ -12,7 +12,17 @@ router.get('/', async (req, res, next) => {
     if (featured === 'true') filter.isFeatured = true;
     let q = Brand.find(filter).sort({ order: 1, name: 1 });
     if (limit) q = q.limit(parseInt(limit));
-    const brands = await q;
+    const [brandDocs, counts] = await Promise.all([
+      q.lean(),
+      // B-15: live per-brand product count so the public Brands grid and the
+      // admin Brands table aren't stuck on a stale, manually-maintained number.
+      Product.aggregate([
+        { $match: { status: 'active', location: { $in: ['egypt-online', 'egypt-both'] } } },
+        { $group: { _id: '$brandRef', count: { $sum: 1 } } },
+      ]),
+    ]);
+    const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+    const brands = brandDocs.map((b) => ({ ...b, productCount: countMap.get(String(b._id)) || 0 }));
     res.json({ success: true, data: brands });
   } catch (e) { next(e); }
 });

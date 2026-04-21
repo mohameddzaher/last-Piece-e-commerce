@@ -1,10 +1,12 @@
 import Order from '../models/Order.js';
 import Cart from '../models/Cart.js';
 import User from '../models/User.js';
+import Product from '../models/Product.js';
 import { generateOrderNumber } from '../utils/helpers.js';
 import { sendOrderConfirmation, sendOrderStatusUpdate } from '../utils/email.js';
 import { calculatePagination } from '../utils/helpers.js';
-import { emitOrderChange, emitDashboardRefresh } from '../realtime/io.js';
+import { emitOrderChange, emitDashboardRefresh, emitProductChange } from '../realtime/io.js';
+import { resolveProductImageUrls } from '../utils/helpers.js';
 
 export const createOrder = async (req, res, next) => {
   try {
@@ -24,6 +26,27 @@ export const createOrder = async (req, res, next) => {
         success: false,
         message: 'Cart is empty',
       });
+    }
+
+    // Validate each product is still available. One-of-one inventory means if
+    // another order reserved it in the meantime, we must reject before we take
+    // this customer's money. Also guards against the "price = 0" public listing
+    // slipping through if a catalog edit didn't set a selling price.
+    for (const item of cart.items) {
+      const p = item.productId;
+      if (!p) continue;
+      if (p.location === 'sold' || p.status !== 'active') {
+        return res.status(409).json({
+          success: false,
+          message: `"${p.name}" is no longer available. Remove it from your cart.`,
+        });
+      }
+      if (!(p.price > 0) && !(item.price > 0)) {
+        return res.status(400).json({
+          success: false,
+          message: `"${p.name}" has no price set. Please contact us.`,
+        });
+      }
     }
 
     const user = await User.findById(req.user.id);
@@ -67,6 +90,25 @@ export const createOrder = async (req, res, next) => {
       ],
     });
 
+    // Reserve the pairs — since our inventory is strictly one-of-one, as soon
+    // as a customer places an order we mark the product as sold so nobody else
+    // can buy the same pair while we ship it. If the order is later cancelled,
+    // the cancellation handler flips them back to their previous location.
+    const reservedProductIds = cart.items.map((item) => item.productId._id);
+    const soldProducts = [];
+    for (const p of await Product.find({ _id: { $in: reservedProductIds } })) {
+      p.locationHistory.push({
+        location: 'sold',
+        changedAt: new Date(),
+        changedBy: req.user.id,
+        notes: `Reserved by online order ${orderNumber}`,
+      });
+      p.location = 'sold';
+      p.status = 'inactive';
+      await p.save();
+      soldProducts.push(p);
+    }
+
     // Clear cart
     await Cart.findOneAndUpdate({ userId: req.user.id }, { items: [], total: 0 });
 
@@ -80,6 +122,8 @@ export const createOrder = async (req, res, next) => {
     await user.save();
 
     emitOrderChange('order:created', order, req.user.id);
+    // Broadcast each product:updated so public listings drop the pair live.
+    soldProducts.forEach((p) => emitProductChange('product:updated', resolveProductImageUrls(p)));
     emitDashboardRefresh();
 
     res.status(201).json({
@@ -227,11 +271,29 @@ export const cancelOrder = async (req, res, next) => {
 
     await order.save();
 
+    // Release the reserved products back to egypt-online so other customers
+    // can buy them again. Counterpart of the reservation in createOrder.
+    const productIds = (order.items || []).map((i) => i.productId);
+    const released = [];
+    for (const p of await Product.find({ _id: { $in: productIds }, location: 'sold' })) {
+      p.locationHistory.push({
+        location: 'egypt-online',
+        changedAt: new Date(),
+        changedBy: req.user.id,
+        notes: `Released — order ${order.orderNumber} cancelled`,
+      });
+      p.location = 'egypt-online';
+      p.status = 'active';
+      await p.save();
+      released.push(p);
+    }
+
     // Send cancellation email
     const user = await User.findById(order.userId);
     await sendOrderStatusUpdate(user.email, order, 'cancelled');
 
     emitOrderChange('order:status-changed', order, order.userId);
+    released.forEach((p) => emitProductChange('product:updated', resolveProductImageUrls(p)));
     emitDashboardRefresh();
 
     res.status(200).json({

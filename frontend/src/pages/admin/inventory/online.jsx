@@ -6,6 +6,7 @@ export default function EgyptOnline() {
       bucket="egypt-online"
       title="Egypt — Online"
       description="Products live on the website. Customers can buy these now."
+      requiredRoles={['super-admin', 'admin', 'egypt-staff']}
     />
   );
 }

@@ -13,20 +13,22 @@ import {
   FiShoppingCart, FiPercent, FiActivity, FiZap,
 } from 'react-icons/fi';
 import {
-  productAPI, expenseAPI, saleAPI, adminAPI, promoCodeAPI,
+  productAPI, expenseAPI, saleAPI, adminAPI, promoCodeAPI, fxAPI,
 } from '@/utils/endpoints';
 import { useAuthStore } from '@/store';
 import { useSocketEvent } from '@/utils/socket';
 import { fmtMoney, fmtPct, fmtDate, fmtDateTime } from '@/utils/format';
+import { toEGP, ratesFromReferences } from '@/utils/fxConvert';
 
 /* ---------- helpers ---------- */
 
-const toEGP = (amount, currency) => {
-  if (!amount) return 0;
-  if (!currency || currency === 'EGP') return amount;
-  if (currency === 'SAR') return amount * 13.25;
-  if (currency === 'USD') return amount * 49;
-  return amount;
+// Landed cost for a product in EGP. Prefers the frozen purchasePriceEGP that
+// the backend wrote at save time (so FX moves don't rewrite history), falls
+// back to landedCost if that's what's populated, then to a live conversion.
+const inventoryValueEGP = (p, rates) => {
+  if (p.purchasePriceEGP > 0) return p.purchasePriceEGP;
+  if (p.landedCost > 0) return p.landedCost; // already EGP for EGP-based inventory
+  return toEGP(p.purchasePrice || 0, p.purchaseCurrency || 'SAR', rates);
 };
 
 const startOfDay = (d) => {
@@ -60,6 +62,7 @@ export default function AdminDashboard() {
   const [expenses, setExpenses] = useState([]);
   const [promos, setPromos] = useState([]);
   const [userCount, setUserCount] = useState(0);
+  const [fxRates, setFxRates] = useState({ EGP: 1 });
 
   const isSuper = role === 'super-admin' || role === 'admin';
   const isSaudi = role === 'saudi-staff';
@@ -67,7 +70,7 @@ export default function AdminDashboard() {
 
   const load = async () => {
     try {
-      const [sa, tr, on, of, salesRes, orderRes, expRes, promoRes, statsRes] = await Promise.all([
+      const [sa, tr, on, of, salesRes, orderRes, expRes, promoRes, statsRes, fxRes] = await Promise.all([
         (isSuper || isSaudi) ? productAPI.getInventory('saudi').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
         (isSuper || isSaudi) ? productAPI.getInventory('transit').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
         (isSuper || isEgypt) ? productAPI.getInventory('egypt-online').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
@@ -77,6 +80,7 @@ export default function AdminDashboard() {
         isSuper ? expenseAPI.getAll({ limit: 1000 }).catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
         isSuper ? promoCodeAPI.getAll().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
         isSuper ? adminAPI.getStats().catch(() => ({ data: { data: {} } })) : Promise.resolve({ data: { data: {} } }),
+        isSuper ? fxAPI.getReferences().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
       ]);
       setInventory({
         saudi: sa.data.data || [],
@@ -89,6 +93,7 @@ export default function AdminDashboard() {
       setExpenses(expRes.data.data || []);
       setPromos(promoRes.data.data || []);
       setUserCount(statsRes.data?.data?.totalUsers || 0);
+      setFxRates(ratesFromReferences(fxRes.data?.data || []));
     } finally {
       setLoading(false);
     }
@@ -112,7 +117,10 @@ export default function AdminDashboard() {
     const ordersP = orders.filter((o) => inPeriod(o.createdAt, days));
     const paidOrdersP = ordersP.filter((o) => ['completed', 'delivered'].includes(o.payment?.status) || ['delivered'].includes(o.status));
 
-    // Revenue by channel (in EGP)
+    // B-13: Revenue and AOV must share the same transaction set — only the
+    // transactions that actually produced money (boutique sales + PAID online
+    // orders). Pending/cancelled orders don't count as revenue and shouldn't
+    // inflate or deflate the average order value either.
     const offlineRevenue = salesP.reduce((s, x) => s + (x.total || 0), 0);
     const onlineRevenue = paidOrdersP.reduce((s, x) => s + (x.pricing?.total || 0), 0);
     const totalRevenue = offlineRevenue + onlineRevenue;
@@ -121,12 +129,21 @@ export default function AdminDashboard() {
     const grossProfit = salesP.reduce((s, x) => s + (x.totalProfit || 0), 0);
 
     const expensesP = expenses.filter((x) => inPeriod(x.incurredOn || x.createdAt, days));
-    const opex = expensesP.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP'), 0);
+    const opex = expensesP.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP', fxRates), 0);
     const netProfit = grossProfit - opex;
 
-    const txnCount = salesP.length + ordersP.length;
-    const aov = txnCount > 0 ? totalRevenue / txnCount : 0;
+    const revenueTxnCount = salesP.length + paidOrdersP.length;
+    const aov = revenueTxnCount > 0 ? totalRevenue / revenueTxnCount : 0;
     const marginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    // B-14: Unique customers = distinct order.userId in the period (online
+    // channel — only place we have a user link). userCount from /admin/stats
+    // is the global total, which is different.
+    const uniqueCustomerIds = new Set();
+    for (const o of paidOrdersP) {
+      if (o.userId) uniqueCustomerIds.add(String(o.userId));
+    }
+    const uniqueCustomers = uniqueCustomerIds.size;
 
     // Month-over-month (last 30 vs prior 30)
     const now = Date.now();
@@ -140,12 +157,15 @@ export default function AdminDashboard() {
     const prevRev = prev.reduce((s, x) => s + (x.total || 0), 0);
     const mom = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : curRev > 0 ? 100 : 0;
 
-    // Inventory value at landed cost (SAR → EGP)
+    // B-08: Inventory value uses the frozen purchasePriceEGP per product (the
+    // rate that was locked at the moment we paid for the pair). Falling back
+    // to a live conversion only if the frozen value is missing keeps the
+    // Dashboard consistent with individual product pages.
     const allInventory = [
       ...inventory.saudi, ...inventory.transit, ...inventory.online, ...inventory.offline,
     ];
     const inventoryValue = allInventory.reduce(
-      (s, p) => s + toEGP(p.landedCost || p.purchasePrice || 0, p.purchaseCurrency || 'SAR'),
+      (s, p) => s + inventoryValueEGP(p, fxRates),
       0,
     );
 
@@ -176,13 +196,15 @@ export default function AdminDashboard() {
     }
     const topProducts = Object.values(topProductMap).sort((x, y) => y.revenue - x.revenue).slice(0, 5);
 
-    // Top brands from inventory (most of the sold products share brand data)
+    // Top brands from inventory (most of the sold products share brand data).
+    // B-08: use the same frozen-landed-cost helper as the Inventory Value tile
+    // so the two numbers reconcile.
     const brandMap = {};
     for (const p of allInventory) {
       const name = p.brandRef?.name || p.brand || '—';
       if (!brandMap[name]) brandMap[name] = { name, units: 0, value: 0 };
       brandMap[name].units += 1;
-      brandMap[name].value += toEGP(p.landedCost || p.purchasePrice || 0, p.purchaseCurrency || 'SAR');
+      brandMap[name].value += inventoryValueEGP(p, fxRates);
     }
     const topBrands = Object.values(brandMap).sort((x, y) => y.value - x.value).slice(0, 5);
 
@@ -205,7 +227,7 @@ export default function AdminDashboard() {
     for (const e of expensesP) {
       const c = e.category || 'other';
       if (!expCat[c]) expCat[c] = 0;
-      expCat[c] += toEGP(e.amount || 0, e.currency || 'EGP');
+      expCat[c] += toEGP(e.amount || 0, e.currency || 'EGP', fxRates);
     }
     const expByCategory = Object.entries(expCat).map(([k, v]) => ({ category: k, amount: v })).sort((x, y) => y.amount - x.amount);
 
@@ -221,7 +243,11 @@ export default function AdminDashboard() {
       ...ordersP.map((o) => ({
         type: 'order',
         when: o.createdAt,
-        title: `Online order · ${o.orderNumber}`,
+        title: (
+          <>
+            Online order · <span className="font-mono">{o.orderNumber}</span>
+          </>
+        ),
         value: o.pricing?.total,
         currency: o.payment?.currency || 'EGP',
       })),
@@ -234,10 +260,11 @@ export default function AdminDashboard() {
       p.location !== 'sold' && new Date(p.createdAt).getTime() < staleCutoff,
     ).length;
     if (stale > 0) alerts.push({ level: 'warn', msg: `${stale} product${stale > 1 ? 's' : ''} older than 60 days and still in stock` });
-    const lowPrice = allInventory.filter((p) =>
-      p.minSellPrice > 0 && p.landedCost &&
-      p.minSellPrice < toEGP(p.landedCost, p.purchaseCurrency || 'SAR'),
-    ).length;
+    const lowPrice = allInventory.filter((p) => {
+      if (!(p.minSellPrice > 0)) return false;
+      const cost = inventoryValueEGP(p, fxRates);
+      return cost > 0 && p.minSellPrice < cost;
+    }).length;
     if (lowPrice > 0) alerts.push({ level: 'warn', msg: `${lowPrice} product${lowPrice > 1 ? 's' : ''} have a minimum sell price below landed cost` });
     const expiringPromos = promos.filter((p) => {
       if (!p.expiresAt) return false;
@@ -249,8 +276,9 @@ export default function AdminDashboard() {
     return {
       totalRevenue, onlineRevenue, offlineRevenue,
       totalCOGS, grossProfit, opex, netProfit,
-      txnCount, aov, marginPct, mom,
+      txnCount: revenueTxnCount, aov, marginPct, mom,
       inventoryValue,
+      uniqueCustomers,
       counts: {
         saudi: inventory.saudi.length,
         transit: inventory.transit.length,
@@ -264,7 +292,7 @@ export default function AdminDashboard() {
       paidOrderCount: paidOrdersP.length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales, orders, expenses, inventory, promos, period]);
+  }, [sales, orders, expenses, inventory, promos, period, fxRates]);
 
   const maxSeries = Math.max(1, ...a.series.map((d) => d.revenue));
 
@@ -455,7 +483,13 @@ export default function AdminDashboard() {
                   total={a.totalRevenue}
                 />
               </div>
-              <StatCard label="Total customers" value={userCount} icon={FiUsers} accent="blue" />
+              <StatCard
+                label="Customers this period"
+                value={a.uniqueCustomers}
+                sub={`${userCount} registered total`}
+                icon={FiUsers}
+                accent="blue"
+              />
               <FxReferenceCard />
               <FxRateCard />
               <FxImpactCard />

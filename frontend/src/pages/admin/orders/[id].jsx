@@ -27,10 +27,13 @@ export default function AdminOrderDetail() {
     catch { toast.error('Failed'); }
   };
 
-  if (!order) return <AdminLayout title="Order"><div className="text-xs text-slate-400">Loading...</div></AdminLayout>;
+  if (!order) return <AdminLayout title="Order" requiredRoles={['super-admin', 'admin']}><div className="text-xs text-slate-400">Loading...</div></AdminLayout>;
 
   return (
-    <AdminLayout title={`Order ${order.orderNumber}`}>
+    <AdminLayout
+      title={<>Order <span className="font-mono tracking-tight">{order.orderNumber}</span></>}
+      requiredRoles={['super-admin', 'admin']}
+    >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Items</h3>

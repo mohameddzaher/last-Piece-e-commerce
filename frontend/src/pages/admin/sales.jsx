@@ -99,6 +99,7 @@ export default function AdminSales() {
   return (
     <AdminLayout
       title="Boutique Sales"
+      requiredRoles={['super-admin', 'admin', 'egypt-staff']}
       actions={
         <button onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-md hover:bg-emerald-600">
           <FiPlus size={12} /> Log Offline Sale

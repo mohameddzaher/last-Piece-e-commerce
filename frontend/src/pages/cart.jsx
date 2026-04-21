@@ -176,7 +176,7 @@ export default function Cart() {
                             {item.name}
                           </h3>
                         </Link>
-                        <p className='text-blue-400 font-bold mt-1'>${item.price?.toFixed(2)}</p>
+                        <p className='text-blue-400 font-bold mt-1 tabular-nums'>EGP {Math.round(item.price || 0).toLocaleString()}</p>
 
                         {/* Quantity Controls */}
                         <div className='flex items-center gap-4 mt-3'>
@@ -207,7 +207,7 @@ export default function Cart() {
 
                       {/* Item Total */}
                       <div className='text-right'>
-                        <p className='font-bold text-white'>${(item.price * item.quantity).toFixed(2)}</p>
+                        <p className='font-bold text-white tabular-nums'>EGP {Math.round((item.price || 0) * item.quantity).toLocaleString()}</p>
                       </div>
                     </div>
                   </motion.div>

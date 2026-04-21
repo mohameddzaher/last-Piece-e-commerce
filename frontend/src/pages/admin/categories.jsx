@@ -56,6 +56,7 @@ export default function AdminCategories() {
   return (
     <AdminLayout
       title="Categories"
+      requiredRoles={['super-admin', 'admin']}
       actions={
         <button onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded-md">
           <FiPlus size={12} /> New

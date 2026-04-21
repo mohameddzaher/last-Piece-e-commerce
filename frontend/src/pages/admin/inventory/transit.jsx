@@ -6,6 +6,7 @@ export default function InTransit() {
       bucket="transit"
       title="In Transit"
       description="Products in the Saudi → Egypt shipping pipeline."
+      requiredRoles={['super-admin', 'admin', 'saudi-staff']}
     />
   );
 }

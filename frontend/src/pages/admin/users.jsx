@@ -119,7 +119,7 @@ export default function AdminUsers() {
   ];
 
   return (
-    <AdminLayout title="Team & Customers">
+    <AdminLayout title="Team & Customers" requiredRoles={['super-admin']}>
       <p className="text-xs text-slate-500 mb-4">
         Super-admins can change roles, block, or remove users. Be careful — these changes apply instantly.
       </p>

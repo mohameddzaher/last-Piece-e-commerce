@@ -155,7 +155,7 @@ export default function Orders() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
                           <p className="font-bold text-white">
-                            Order #{order.orderNumber}
+                            Order <span className="font-mono">#{order.orderNumber}</span>
                           </p>
                           <span
                             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm capitalize ${getStatusColor(order.status)}`}

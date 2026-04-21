@@ -63,7 +63,7 @@ export default function AdminReviews() {
   ];
 
   return (
-    <AdminLayout title="Reviews">
+    <AdminLayout title="Reviews" requiredRoles={['super-admin', 'admin']}>
       <p className="text-xs text-slate-500 mb-4">
         Product reviews are only accepted from verified buyers. Store reviews (homepage) are open to anyone logged in.
       </p>

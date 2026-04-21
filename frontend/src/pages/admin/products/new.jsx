@@ -21,7 +21,7 @@ export default function NewProduct() {
   };
 
   return (
-    <AdminLayout title="Register New Product">
+    <AdminLayout title="Register New Product" requiredRoles={['super-admin', 'admin', 'saudi-staff']}>
       <p className="text-xs text-slate-500 mb-4">
         Add a newly purchased pair. Saudi staff can fill the purchasing fields; super-admins set selling prices later.
       </p>

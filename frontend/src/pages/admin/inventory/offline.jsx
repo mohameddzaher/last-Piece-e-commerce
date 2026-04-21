@@ -6,6 +6,7 @@ export default function EgyptOffline() {
       bucket="egypt-offline"
       title="Egypt — Boutique"
       description="Products available at the physical store in Egypt."
+      requiredRoles={['super-admin', 'admin', 'egypt-staff']}
     />
   );
 }

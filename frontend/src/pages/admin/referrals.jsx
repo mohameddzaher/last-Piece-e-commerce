@@ -28,7 +28,7 @@ export default function AdminReferrals() {
   ];
 
   return (
-    <AdminLayout title="Referrals">
+    <AdminLayout title="Referrals" requiredRoles={['super-admin', 'admin']}>
       <p className="text-xs text-slate-500 mb-4">
         Each customer gets a personal referral code. Track invitations, conversions, and rewards paid.
       </p>

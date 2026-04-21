@@ -93,7 +93,7 @@ const SocketIndicator = () => {
   );
 };
 
-export default function AdminLayout({ children, title, actions }) {
+export default function AdminLayout({ children, title, actions, requiredRoles }) {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
   const t = useI18n((s) => s.t);
@@ -118,7 +118,19 @@ export default function AdminLayout({ children, title, actions }) {
 
     if (isAuthenticated && user?.role) {
       const allowed = ['super-admin', 'admin', 'saudi-staff', 'egypt-staff'];
-      setGateDecision(allowed.includes(user.role) ? 'allow' : 'reject-home');
+      if (!allowed.includes(user.role)) {
+        setGateDecision('reject-home');
+        return;
+      }
+      // Per-page role check (R-01/R-02): e.g. /admin/expenses passes
+      // requiredRoles=['super-admin','admin'], so Asmaa (saudi-staff) who
+      // types that URL directly gets bounced back to /admin instead of
+      // seeing the page shell (even though the API would reject her calls).
+      if (requiredRoles && requiredRoles.length > 0 && !requiredRoles.includes(user.role)) {
+        setGateDecision('reject-admin-home');
+        return;
+      }
+      setGateDecision('allow');
       return;
     }
 
@@ -133,13 +145,16 @@ export default function AdminLayout({ children, title, actions }) {
       }
     }, hasToken ? 3000 : 600);
     return () => clearTimeout(timer);
-  }, [isAuthenticated, user?.role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.role, (requiredRoles || []).join(',')]);
 
   useEffect(() => {
     if (gateDecision === 'reject-login') {
       router.push('/login?next=' + encodeURIComponent(router.asPath));
     } else if (gateDecision === 'reject-home') {
       router.push('/');
+    } else if (gateDecision === 'reject-admin-home') {
+      router.replace('/admin');
     }
   }, [gateDecision, router]);
 

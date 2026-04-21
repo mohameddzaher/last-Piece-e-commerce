@@ -15,7 +15,7 @@ import { useAuthStore } from '@/store';
  * Reusable admin inventory view. `bucket` is one of
  * 'saudi' | 'transit' | 'egypt-online' | 'egypt-offline'.
  */
-export default function InventoryPage({ bucket, title, description }) {
+export default function InventoryPage({ bucket, title, description, requiredRoles }) {
   const { user } = useAuthStore();
   const role = user?.role;
   const [rows, setRows] = useState([]);
@@ -119,7 +119,10 @@ export default function InventoryPage({ bucket, title, description }) {
       base.push({
         key: 'margin', label: 'Margin',
         render: (r) => {
-          const landed = r.landedCost ? r.landedCost * 8.3 : (r.purchasePrice || 0) * 8.3;
+          // Use the frozen landed cost in EGP that the backend saved at
+          // purchase time (purchasePriceEGP). The previous `landedCost * 8.3`
+          // hardcoded a stale rate and misreported margins.
+          const landed = r.purchasePriceEGP || r.landedCost || 0;
           const sell = r.onlinePrice || r.offlinePrice || 0;
           if (!landed || !sell) return <span className="text-[10px] text-slate-400">—</span>;
           const margin = ((sell - landed) / sell) * 100;
@@ -153,7 +156,7 @@ export default function InventoryPage({ bucket, title, description }) {
   const selectedProducts = rows.filter((r) => selected.includes(r._id));
 
   return (
-    <AdminLayout title={title}>
+    <AdminLayout title={title} requiredRoles={requiredRoles}>
       {description && <p className="text-xs text-slate-500 mb-4">{description}</p>}
       <DataTable
         columns={columns}

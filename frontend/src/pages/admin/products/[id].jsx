@@ -29,7 +29,7 @@ export default function EditProduct() {
   };
 
   return (
-    <AdminLayout title={product ? `Edit: ${product.name}` : 'Edit Product'}>
+    <AdminLayout title={product ? `Edit: ${product.name}` : 'Edit Product'} requiredRoles={['super-admin', 'admin']}>
       {loading ? <div className="text-xs text-slate-400">Loading...</div> : product ? (
         <ProductForm initial={product} onSubmit={onSubmit} editing />
       ) : (

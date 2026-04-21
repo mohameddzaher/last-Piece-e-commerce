@@ -97,7 +97,7 @@ export default function AdminShipments() {
   ];
 
   return (
-    <AdminLayout title="Shipments">
+    <AdminLayout title="Shipments" requiredRoles={['super-admin', 'admin', 'saudi-staff']}>
       <p className="text-xs text-slate-500 mb-4">
         Shipping cost is allocated across the pairs in each shipment. Mark delivered to release inventory into Egypt.
       </p>
