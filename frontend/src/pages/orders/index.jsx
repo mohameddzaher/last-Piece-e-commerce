@@ -216,8 +216,8 @@ export default function Orders() {
 
                       <div className="text-right flex items-center gap-4">
                         <div>
-                          <p className="text-xl font-bold text-white">
-                            ${order.totals?.total?.toFixed(2)}
+                          <p className="text-xl font-bold text-white tabular-nums">
+                            {`${order.payment?.currency || 'EGP'} ${Math.round(order.pricing?.total || 0).toLocaleString()}`}
                           </p>
                         </div>
                         <FiChevronRight className="text-gray-500" size={20} />

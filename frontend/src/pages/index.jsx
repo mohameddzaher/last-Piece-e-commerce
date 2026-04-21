@@ -423,6 +423,7 @@ export default function Home() {
                     src={cat.image}
                     alt={cat.name}
                     fill
+                    sizes='(max-width: 1024px) 50vw, 25vw'
                     className='object-cover group-hover:scale-110 transition-transform duration-500'
                   />
                   <div className='absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent'></div>
@@ -431,7 +432,7 @@ export default function Home() {
                       {t(`nav.${cat.slug}`, cat.name)}
                     </h3>
                     <div className='flex items-center justify-between'>
-                      <span className='text-gray-300 text-xs'>{categoryCounts[cat.slug] ?? '—'} pairs</span>
+                      <span className='text-gray-300 text-xs capitalize'>Shop {cat.name.toLowerCase()}</span>
                       <FiArrowRight className='text-white text-xs opacity-0 group-hover:opacity-100 transition-all' size={12} />
                     </div>
                   </div>

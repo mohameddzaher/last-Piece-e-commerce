@@ -100,28 +100,52 @@ export default function AdminLayout({ children, title, actions }) {
   const lang = useI18n((s) => s.lang);
   const setLanguage = useI18n((s) => s.setLanguage);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+
+  // Auth-gate strategy:
+  //   The zustand auth store hydrates asynchronously after _app.jsx calls
+  //   authAPI.getProfile() on mount. We must NOT redirect before the user
+  //   object has had a chance to arrive — otherwise we flash-redirect a
+  //   super-admin to /login while their token is still being validated.
+  //
+  //   We give a 1.2s window for the session to restore. If there's a token in
+  //   localStorage we wait longer (authenticated state will resolve). If
+  //   there's no token at all we redirect almost immediately.
+  const [gateDecision, setGateDecision] = useState(null); // 'wait' | 'allow' | 'reject-login' | 'reject-home'
 
   useEffect(() => {
-    // Wait one tick for the auth store to hydrate before redirecting
-    const t = setTimeout(() => setAuthChecked(true), 400);
-    return () => clearTimeout(t);
-  }, []);
+    const hasToken =
+      typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
 
-  useEffect(() => {
-    if (!authChecked) return;
-    if (!isAuthenticated) {
-      router.push('/login?next=' + encodeURIComponent(router.asPath));
+    if (isAuthenticated && user?.role) {
+      const allowed = ['super-admin', 'admin', 'saudi-staff', 'egypt-staff'];
+      setGateDecision(allowed.includes(user.role) ? 'allow' : 'reject-home');
       return;
     }
-    const allowed = ['super-admin', 'admin', 'saudi-staff', 'egypt-staff'];
-    if (!allowed.includes(user?.role)) router.push('/');
-  }, [authChecked, isAuthenticated, user, router]);
 
-  // Live indicator: dashboard refresh broadcasts cause a layout-level toast — useful as proof of life.
+    // Still hydrating — keep waiting.
+    setGateDecision('wait');
+    const timer = setTimeout(() => {
+      if (!hasToken) {
+        setGateDecision('reject-login');
+      } else if (!isAuthenticated || !user?.role) {
+        // Token exists but profile fetch failed / hung — fall back to login.
+        setGateDecision('reject-login');
+      }
+    }, hasToken ? 3000 : 600);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, user?.role]);
+
+  useEffect(() => {
+    if (gateDecision === 'reject-login') {
+      router.push('/login?next=' + encodeURIComponent(router.asPath));
+    } else if (gateDecision === 'reject-home') {
+      router.push('/');
+    }
+  }, [gateDecision, router]);
+
   useSocketEvent('connected', () => {});
 
-  if (!isAuthenticated || !user) {
+  if (gateDecision !== 'allow') {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
         <div className="text-slate-400 text-sm">Loading...</div>

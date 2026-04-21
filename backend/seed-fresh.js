@@ -182,9 +182,9 @@ const seedSampleProducts = async (cats, brandsMap, founder) => {
       color: 'White / Black',
       condition: 'new',
       images: [
-        { url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1200', alt: 'Yeezy 350 Zebra', isPrimary: true },
+        { url: 'https://images.unsplash.com/photo-1605348532760-6753d2c43329?w=1200', alt: 'Yeezy 350 Zebra', isPrimary: true },
       ],
-      thumbnail: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600',
+      thumbnail: 'https://images.unsplash.com/photo-1605348532760-6753d2c43329?w=600',
       // Pipeline state #2: live online in Egypt — published, customers can buy
       location: 'egypt-online',
       status: 'active',

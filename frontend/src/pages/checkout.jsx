@@ -107,10 +107,15 @@ export default function Checkout() {
     }
   };
 
+  // Pricing rules — match backend expectations.
+  //   shipping: free over 5,000 EGP, otherwise 100 EGP within Egypt.
+  //   tax: no VAT applied on consumer checkout for now (0%). If the
+  //   super-admin ever enables VAT, update this in one place.
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal > 50 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
+  const shipping = subtotal > 5000 ? 0 : 100;
+  const tax = 0;
   const orderTotal = subtotal + shipping + tax;
+  const fmt = (n) => `EGP ${Math.round(n).toLocaleString()}`;
 
   if (items.length === 0) {
     return (
@@ -265,13 +270,19 @@ export default function Checkout() {
                     </div>
                     <div>
                       <label className='block text-xs text-gray-400 mb-1'>Country</label>
-                      <input
-                        type='text'
-                        value={formData.shippingAddress.country}
+                      <select
+                        value={formData.shippingAddress.country || 'Egypt'}
                         onChange={(e) => handleAddressChange('shippingAddress', 'country', e.target.value)}
                         required
-                        className='w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                      />
+                        className='w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-blue-500'
+                      >
+                        <option value='Egypt'>Egypt</option>
+                        <option value='Saudi Arabia'>Saudi Arabia</option>
+                        <option value='United Arab Emirates'>United Arab Emirates</option>
+                        <option value='Kuwait'>Kuwait</option>
+                        <option value='Qatar'>Qatar</option>
+                        <option value='Bahrain'>Bahrain</option>
+                      </select>
                     </div>
                   </div>
 
@@ -473,7 +484,7 @@ export default function Checkout() {
                             <p className='text-xs text-gray-500'>Qty: {item.quantity}</p>
                           </div>
                           <p className='text-sm font-medium text-white'>
-                            ${(item.price * item.quantity).toFixed(2)}
+                            {fmt(item.price * item.quantity)}
                           </p>
                         </div>
                       ))}
@@ -554,7 +565,7 @@ export default function Checkout() {
                       <p className='text-xs text-white truncate'>{item.name}</p>
                       <p className='text-xs text-gray-500'>x{item.quantity}</p>
                     </div>
-                    <p className='text-xs text-white'>${(item.price * item.quantity).toFixed(2)}</p>
+                    <p className='text-xs text-white'>{fmt(item.price * item.quantity)}</p>
                   </div>
                 ))}
                 {items.length > 3 && (
@@ -565,19 +576,21 @@ export default function Checkout() {
               <div className='border-t border-slate-800 pt-4 space-y-2'>
                 <div className='flex justify-between text-sm'>
                   <span className='text-gray-400'>Subtotal</span>
-                  <span className='text-white'>${subtotal.toFixed(2)}</span>
+                  <span className='text-white'>{fmt(subtotal)}</span>
                 </div>
                 <div className='flex justify-between text-sm'>
                   <span className='text-gray-400'>Shipping</span>
-                  <span className='text-white'>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                  <span className='text-white'>{shipping === 0 ? 'Free' : fmt(shipping)}</span>
                 </div>
-                <div className='flex justify-between text-sm'>
-                  <span className='text-gray-400'>Tax</span>
-                  <span className='text-white'>${tax.toFixed(2)}</span>
-                </div>
+                {tax > 0 && (
+                  <div className='flex justify-between text-sm'>
+                    <span className='text-gray-400'>Tax</span>
+                    <span className='text-white'>{fmt(tax)}</span>
+                  </div>
+                )}
                 <div className='flex justify-between text-base font-semibold pt-2 border-t border-slate-800'>
                   <span className='text-white'>Total</span>
-                  <span className='text-white'>${orderTotal.toFixed(2)}</span>
+                  <span className='text-white'>{fmt(orderTotal)}</span>
                 </div>
               </div>
 

@@ -146,21 +146,6 @@ export default function Login() {
             <div className='flex-1 h-px bg-slate-800'></div>
           </div>
 
-          {/* Demo Accounts */}
-          <div className='bg-slate-900/50 border border-slate-800 rounded-lg p-3 mb-5'>
-            <p className='text-xs text-gray-400 mb-2'>Demo Accounts:</p>
-            <div className='space-y-1.5 text-xs'>
-              <div className='flex justify-between'>
-                <span className='text-gray-500'>Admin:</span>
-                <span className='text-gray-300'>admin@lastpiece.com / Admin@12345</span>
-              </div>
-              <div className='flex justify-between'>
-                <span className='text-gray-500'>User:</span>
-                <span className='text-gray-300'>user@lastpiece.com / User@12345</span>
-              </div>
-            </div>
-          </div>
-
           {/* Sign Up Link */}
           <p className='text-center text-gray-400 text-xs'>
             Don't have an account?{' '}
