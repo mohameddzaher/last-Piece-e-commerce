@@ -52,6 +52,54 @@ const DEFAULT_HOME_FAQS = [
   },
 ];
 
+/**
+ * Hero floating card — renders a skeleton until the real product arrives
+ * instead of a misleading Unsplash placeholder, so the first paint is already
+ * the final visual state.
+ */
+function HeroFloatCard({ product, badgeLabel, badgeColor, className, imageTint, nameSize, priceSize }) {
+  const loaded = !!product;
+  return (
+    <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl ${className}`}>
+      <div className={`aspect-square bg-gradient-to-br ${imageTint} relative`}>
+        {loaded && product.thumbnail ? (
+          <Image
+            src={product.thumbnail}
+            alt={product.name || ''}
+            fill
+            sizes='(max-width: 640px) 160px, (max-width: 1024px) 192px, 224px'
+            className='object-cover'
+          />
+        ) : (
+          <div className='absolute inset-0 bg-slate-800 animate-pulse' />
+        )}
+        {loaded && (
+          <div className={`absolute top-2 left-2 px-2 py-0.5 ${badgeColor} rounded text-white text-[10px] font-bold`}>
+            {badgeLabel}
+          </div>
+        )}
+      </div>
+      <div className='p-3'>
+        {loaded ? (
+          <>
+            <h3 className={`text-white font-semibold ${nameSize} truncate`}>{product.name}</h3>
+            <p className='text-gray-500 text-[10px] mt-0.5'>{product.size ? `Size ${product.size}` : '—'}</p>
+            <span className={`mt-2 block font-bold text-white ${priceSize}`}>
+              {product.price ? `${product.sellingCurrency || 'EGP'} ${product.price.toLocaleString()}` : ''}
+            </span>
+          </>
+        ) : (
+          <>
+            <div className='h-3 w-3/4 bg-slate-800 rounded animate-pulse' />
+            <div className='h-2 w-1/2 bg-slate-800 rounded animate-pulse mt-2' />
+            <div className='h-4 w-2/3 bg-slate-800 rounded animate-pulse mt-2' />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HomeFaqRow({ q, a, open, onToggle }) {
   return (
     <div
@@ -284,53 +332,28 @@ export default function Home() {
               transition={{ duration: 0.7, delay: 0.15 }}
               className='relative mt-4 lg:mt-0'
             >
-              {/* Mobile: two cards stacked side-by-side, smaller.
-                  Desktop: the original rotated floating layout. */}
+              {/* Two rotated floating cards. We render skeletons until the
+                  real products come back — avoids the "placeholder pair flashes
+                  then gets replaced by the actual pair" jank the user noticed. */}
               <div className='relative h-[260px] sm:h-[320px] lg:h-[400px]'>
-                <div className='absolute top-0 right-0 w-40 sm:w-48 lg:w-56 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl transform rotate-3 hover:rotate-0 transition-transform duration-500'>
-                  <div className='aspect-square bg-gradient-to-br from-blue-500/10 to-purple-500/10 relative'>
-                    <Image
-                      src={products[0]?.thumbnail || 'https://images.unsplash.com/photo-1552346154-21d32810aba3?w=400&q=80'}
-                      alt='Featured'
-                      fill
-                      sizes='(max-width: 640px) 160px, (max-width: 1024px) 192px, 224px'
-                      className='object-cover'
-                    />
-                    <div className='absolute top-2 left-2 px-2 py-0.5 bg-red-500 rounded text-white text-[10px] font-bold'>
-                      {t('home.featureLastPiece', 'Last Piece!')}
-                    </div>
-                  </div>
-                  <div className='p-3'>
-                    <h3 className='text-white font-semibold text-sm truncate'>{products[0]?.name || 'Featured pair'}</h3>
-                    <p className='text-gray-500 text-xs mt-0.5'>{products[0]?.size ? `Size ${products[0].size}` : '—'}</p>
-                    <div className='flex items-center justify-between mt-2'>
-                      <span className='text-lg font-bold text-white'>
-                        {products[0]?.price ? `${products[0].sellingCurrency || 'EGP'} ${products[0].price.toLocaleString()}` : ''}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className='absolute bottom-0 left-0 w-36 sm:w-44 lg:w-48 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl transform -rotate-6 hover:rotate-0 transition-transform duration-500'>
-                  <div className='aspect-square bg-gradient-to-br from-purple-500/10 to-pink-500/10 relative'>
-                    <Image
-                      src={products[1]?.thumbnail || 'https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?w=400&q=80'}
-                      alt='Featured'
-                      fill
-                      sizes='(max-width: 640px) 144px, (max-width: 1024px) 176px, 192px'
-                      className='object-cover'
-                    />
-                    <div className='absolute top-2 left-2 px-2 py-0.5 bg-purple-500 rounded text-white text-[10px] font-bold'>
-                      {t('home.featureExclusive', 'Exclusive')}
-                    </div>
-                  </div>
-                  <div className='p-3'>
-                    <h3 className='text-white font-semibold text-xs truncate'>{products[1]?.name || 'Second pair'}</h3>
-                    <p className='text-gray-500 text-[10px] mt-0.5'>{products[1]?.size ? `Size ${products[1].size}` : '—'}</p>
-                    <span className='text-sm font-bold text-white'>
-                      {products[1]?.price ? `${products[1].sellingCurrency || 'EGP'} ${products[1].price.toLocaleString()}` : ''}
-                    </span>
-                  </div>
-                </div>
+                <HeroFloatCard
+                  product={products[0]}
+                  badgeLabel={t('home.featureLastPiece', 'Last Piece!')}
+                  badgeColor='bg-red-500'
+                  className='absolute top-0 right-0 w-40 sm:w-48 lg:w-56 rotate-3 hover:rotate-0 transition-transform duration-500'
+                  imageTint='from-blue-500/10 to-purple-500/10'
+                  nameSize='text-sm'
+                  priceSize='text-lg'
+                />
+                <HeroFloatCard
+                  product={products[1]}
+                  badgeLabel={t('home.featureExclusive', 'Exclusive')}
+                  badgeColor='bg-purple-500'
+                  className='absolute bottom-0 left-0 w-36 sm:w-44 lg:w-48 -rotate-6 hover:rotate-0 transition-transform duration-500'
+                  imageTint='from-purple-500/10 to-pink-500/10'
+                  nameSize='text-xs'
+                  priceSize='text-sm'
+                />
               </div>
             </motion.div>
           </div>

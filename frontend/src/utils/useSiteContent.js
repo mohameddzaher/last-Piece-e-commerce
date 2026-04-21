@@ -4,29 +4,68 @@ import { useI18n } from './i18n';
 import { useSocketEvent } from './socket';
 
 /**
- * Fetch all public CMS entries and return a keyed map with current-language values.
- * Re-fetches when the language changes or when the CMS updates in real-time.
+ * Fetch all public CMS entries keyed by `key`, in the active language.
+ *
+ * Stale-while-revalidate pattern:
+ *  1. On mount, pre-populate state from a localStorage cache keyed by lang,
+ *     so the FIRST render already has the correct content — no more flicker
+ *     where the page renders defaults, then swaps to CMS data a moment later.
+ *  2. Kick off a network fetch in the background. When it returns, update
+ *     state AND the cache so the next visit is even fresher.
+ *
+ * Also re-fetches when the language changes or when CMS updates arrive over
+ * socket.io — so admins editing copy see their changes live across tabs.
  */
+const CACHE_KEY = (lang) => `lp_cms_cache_${lang}`;
+
+const readCache = (lang) => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(CACHE_KEY(lang));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeCache = (lang, map) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(CACHE_KEY(lang), JSON.stringify(map));
+  } catch {}
+};
+
 export const useSiteContent = () => {
   const lang = useI18n((s) => s.lang);
+  // Initial state is empty on BOTH server and first client render (SSR safe).
+  // We hydrate from cache in the first effect — this avoids a hydration
+  // mismatch while still making the content available ~immediately.
   const [map, setMap] = useState({});
 
-  const load = async () => {
+  const load = async (currentLang) => {
     try {
-      const r = await siteContentAPI.getAll({ lang });
+      const r = await siteContentAPI.getAll({ lang: currentLang });
       const next = {};
       (r.data.data || []).forEach((it) => {
         next[it.key] = it.value;
       });
       setMap(next);
-    } catch (e) {
-      // silent — component can fall back to defaults
+      writeCache(currentLang, next);
+    } catch {
+      // Silent — components fall back to defaults if cache is empty too.
     }
   };
 
-  useEffect(() => { load(); }, [lang]);
-  useSocketEvent('site-content:updated', () => load(), [lang]);
-  useSocketEvent('site-content:deleted', () => load(), [lang]);
+  useEffect(() => {
+    // Synchronously pull cache for this lang → one quick re-render with the
+    // content the user saw last time (usually accurate). Then fetch fresh.
+    const cached = readCache(lang);
+    if (Object.keys(cached).length) setMap(cached);
+    load(lang);
+  }, [lang]);
+
+  useSocketEvent('site-content:updated', () => load(lang), [lang]);
+  useSocketEvent('site-content:deleted', () => load(lang), [lang]);
 
   return map;
 };
