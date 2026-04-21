@@ -1,22 +1,38 @@
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import Link from "next/link";
-import { motion } from "framer-motion";
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
 import {
-  FiArrowLeft,
-  FiPackage,
-  FiClock,
-  FiTruck,
-  FiCheckCircle,
-  FiXCircle,
-  FiMapPin,
-  FiPhone,
-  FiMail,
-} from "react-icons/fi";
-import { useAuthStore } from "@/store";
-import { orderAPI } from "@/utils/endpoints";
-import { getProductImageUrl } from "@/utils/formatters";
-import { toast } from "react-toastify";
+  FiArrowLeft, FiPackage, FiTruck, FiCheckCircle, FiXCircle,
+  FiMapPin, FiPhone, FiCreditCard, FiClock,
+} from 'react-icons/fi';
+import { useAuthStore } from '@/store';
+import { orderAPI } from '@/utils/endpoints';
+import { getProductImageUrl } from '@/utils/formatters';
+import { fmtMoney, fmtDateTime } from '@/utils/format';
+import { toast } from 'react-toastify';
+
+const STATUS_STEPS = [
+  { key: 'pending', label: 'Pending' },
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'dispatched', label: 'Dispatched' },
+  { key: 'in_transit', label: 'In Transit' },
+  { key: 'delivered', label: 'Delivered' },
+];
+
+const STATUS_COLOR = {
+  pending: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+  confirmed: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+  processing: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+  dispatched: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
+  in_transit: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
+  delivered: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  completed: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  cancelled: 'bg-rose-500/10 text-rose-600 border-rose-500/30',
+  returned: 'bg-rose-500/10 text-rose-600 border-rose-500/30',
+};
 
 export default function OrderDetail() {
   const router = useRouter();
@@ -26,172 +42,134 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-    if (id) {
-      fetchOrder();
-    }
-  }, [id, isAuthenticated, router]);
+    if (!isAuthenticated) { router.push('/login'); return; }
+    if (id) fetchOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isAuthenticated]);
 
   const fetchOrder = async () => {
     try {
       setLoading(true);
       const res = await orderAPI.getById(id);
-      if (res.data.success) {
-        setOrder(res.data.data);
-      }
-    } catch (error) {
-      toast.error("Failed to load order");
-      router.push("/orders");
-    } finally {
-      setLoading(false);
-    }
+      if (res.data.success) setOrder(res.data.data);
+    } catch {
+      toast.error('Failed to load order');
+      router.push('/orders');
+    } finally { setLoading(false); }
   };
 
   const handleCancelOrder = async () => {
-    if (!confirm("Are you sure you want to cancel this order?")) return;
+    if (!confirm('Cancel this order?')) return;
     try {
       await orderAPI.cancel(id);
-      toast.success("Order cancelled successfully");
+      toast.success('Order cancelled');
       fetchOrder();
-    } catch (error) {
-      toast.error("Failed to cancel order");
-    }
+    } catch { toast.error('Failed to cancel'); }
   };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-      approved: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-      dispatching: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-      in_transit: "text-orange-400 bg-orange-400/10 border-orange-400/20",
-      delivered: "text-green-400 bg-green-400/10 border-green-400/20",
-      completed: "text-green-400 bg-green-400/10 border-green-400/20",
-      cancelled: "text-red-400 bg-red-400/10 border-red-400/20",
-    };
-    return colors[status] || "text-gray-400 bg-gray-400/10 border-gray-400/20";
-  };
-
-  const orderStatuses = [
-    "pending",
-    "approved",
-    "dispatching",
-    "in_transit",
-    "delivered",
-    "completed",
-  ];
 
   if (!isAuthenticated) return null;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="bg-white min-h-screen">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <div className="h-3 w-32 bg-slate-100 rounded animate-pulse mb-4" />
+          <div className="h-16 bg-slate-100 rounded-xl animate-pulse mb-4" />
+          <div className="h-20 bg-slate-100 rounded-xl animate-pulse" />
+        </div>
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="bg-white min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <FiPackage className="mx-auto text-gray-600 mb-4" size={48} />
-          <h2 className="text-xl font-bold text-white mb-2">Order not found</h2>
-          <Link href="/orders" className="text-blue-400 hover:text-blue-300">
-            Back to Orders
-          </Link>
+          <FiPackage className="mx-auto text-slate-300 mb-3" size={36} />
+          <h2 className="text-base font-bold text-slate-900 mb-1">Order not found</h2>
+          <Link href="/orders" className="text-xs text-blue-600 hover:text-blue-700 font-semibold">Back to orders</Link>
         </div>
       </div>
     );
   }
 
-  const currentStatusIndex = orderStatuses.indexOf(order.status);
+  const currency = order.payment?.currency || 'EGP';
+  const pricing = order.pricing || {};
+  const shippingAddr = order.shippingAddress || {};
+  const currentStatusIdx = STATUS_STEPS.findIndex((s) => s.key === order.status);
+  const cancelled = order.status === 'cancelled' || order.status === 'returned';
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Back Button */}
-        <Link
-          href="/orders"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
-        >
-          <FiArrowLeft size={18} />
-          Back to Orders
-        </Link>
-
-        {/* Order Header */}
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <>
+      {/* Header band (white) */}
+      <section className="bg-white border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-4 py-5">
+          <Link href="/orders" className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 mb-3">
+            <FiArrowLeft size={11} /> Back to orders
+          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-white">
-                Order #{order.orderNumber}
+              <div className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-1">ORDER DETAILS</div>
+              <h1 className="text-lg md:text-xl font-bold text-slate-900">
+                Order <span className="font-mono">#{order.orderNumber}</span>
               </h1>
-              <p className="text-gray-400 mt-1">
-                Placed on{" "}
-                {new Date(order.createdAt).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Placed {fmtDateTime(order.createdAt)}
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <span
-                className={`px-4 py-2 rounded-lg border text-sm font-medium capitalize ${getStatusColor(order.status)}`}
-              >
-                {order.status.replace("_", " ")}
+            <div className="flex items-center gap-2">
+              <span className={`px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${STATUS_COLOR[order.status] || ''}`}>
+                {order.status.replace('_', ' ')}
               </span>
-              {order.status === "pending" && (
+              {order.status === 'pending' && (
                 <button
                   onClick={handleCancelOrder}
-                  className="px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="px-3 py-1 text-[11px] font-semibold text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 rounded-full"
                 >
-                  Cancel Order
+                  Cancel
                 </button>
               )}
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Order Progress */}
-        {order.status !== "cancelled" && (
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 mb-6">
-            <h2 className="font-bold text-white mb-6">Order Progress</h2>
+      {/* Progress tracker (white) */}
+      {!cancelled && (
+        <section className="bg-white border-b border-slate-200">
+          <div className="max-w-5xl mx-auto px-4 py-5">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Progress</div>
             <div className="relative">
-              {/* Progress Line */}
-              <div className="absolute top-4 left-0 right-0 h-1 bg-slate-800">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-500"
-                  style={{
-                    width: `${(currentStatusIndex / (orderStatuses.length - 1)) * 100}%`,
-                  }}
-                />
-              </div>
-
-              {/* Steps */}
-              <div className="relative flex justify-between">
-                {orderStatuses.map((status, index) => {
-                  const isCompleted = index <= currentStatusIndex;
-                  const isCurrent = index === currentStatusIndex;
+              <div className="absolute top-3 left-3 right-3 h-0.5 bg-slate-200" />
+              <div
+                className="absolute top-3 left-3 h-0.5 bg-emerald-500 transition-all duration-500"
+                style={{
+                  width: `calc(${
+                    STATUS_STEPS.length > 1
+                      ? (Math.max(0, currentStatusIdx) / (STATUS_STEPS.length - 1)) * 100
+                      : 0
+                  }% - 1.5rem)`,
+                }}
+              />
+              <div className="relative grid grid-cols-6 gap-2">
+                {STATUS_STEPS.map((step, i) => {
+                  const done = i <= currentStatusIdx;
+                  const curr = i === currentStatusIdx;
                   return (
-                    <div key={status} className="flex flex-col items-center">
+                    <div key={step.key} className="flex flex-col items-center">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${
-                          isCompleted
-                            ? "bg-blue-500 text-white"
-                            : "bg-slate-800 text-gray-500"
-                        } ${isCurrent ? "ring-4 ring-blue-500/30" : ""}`}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center z-10 text-[10px] font-bold ${
+                          done ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'
+                        } ${curr ? 'ring-4 ring-emerald-500/20' : ''}`}
                       >
-                        {isCompleted ? <FiCheckCircle size={16} /> : index + 1}
+                        {done ? <FiCheckCircle size={11} /> : i + 1}
                       </div>
                       <span
-                        className={`mt-2 text-xs capitalize ${isCompleted ? "text-blue-400" : "text-gray-500"}`}
+                        className={`mt-1 text-[9px] text-center leading-tight ${
+                          done ? 'text-emerald-700 font-semibold' : 'text-slate-500'
+                        }`}
                       >
-                        {status.replace("_", " ")}
+                        {step.label}
                       </span>
                     </div>
                   );
@@ -199,142 +177,159 @@ export default function OrderDetail() {
               </div>
             </div>
           </div>
-        )}
+        </section>
+      )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Order Items */}
-          <div className="lg:col-span-2">
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-              <div className="p-4 border-b border-slate-800">
-                <h2 className="font-bold text-white">Order Items</h2>
+      {cancelled && (
+        <section className="bg-rose-50 border-b border-rose-200">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2 text-xs text-rose-700">
+            <FiXCircle size={14} />
+            This order was {order.status}. If this was a mistake, contact us.
+          </div>
+        </section>
+      )}
+
+      {/* Body — two columns on desktop, stack on mobile */}
+      <section className="bg-slate-50 min-h-[60vh]">
+        <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
+          {/* LEFT: items + timeline */}
+          <div className="space-y-4">
+            {/* Items */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                Items · {order.items?.length || 0}
               </div>
-              <div className="divide-y divide-slate-800">
-                {order.items?.map((item, index) => (
-                  <div key={index} className="p-4 flex gap-4">
-                    <div className="w-20 h-20 bg-slate-800 rounded-lg overflow-hidden flex-shrink-0">
-                      {item.product?.thumbnail ? (
+              <ul className="divide-y divide-slate-100">
+                {(order.items || []).map((it, i) => (
+                  <li key={i} className="p-3 flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
+                      {it.productId?.thumbnail || it.thumbnail ? (
                         <img
-                          src={getProductImageUrl(item.product.thumbnail)}
-                          alt={item.product.name}
+                          src={getProductImageUrl(it.productId?.thumbnail || it.thumbnail)}
+                          alt={it.productName}
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-600">
-                          <FiPackage size={24} />
-                        </div>
+                        <FiPackage className="text-slate-300" size={18} />
                       )}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white">
-                        {item.product?.name || "Product"}
-                      </h3>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Quantity: {item.quantity}
-                      </p>
-                      <p className="text-blue-400 font-bold mt-1">
-                        ${item.price?.toFixed(2)}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-slate-900 truncate">{it.productName || 'Product'}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {it.sku && <span className="font-mono">{it.sku} · </span>}Qty {it.quantity || 1}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-white">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </p>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-bold text-slate-900">{fmtMoney(it.subtotal ?? it.price * (it.quantity || 1), currency)}</div>
+                      <div className="text-[10px] text-slate-500">{fmtMoney(it.price, currency)} each</div>
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
+
+            {/* Status timeline */}
+            {order.statusTimeline?.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  Timeline
+                </div>
+                <ul className="p-4 space-y-2 text-[11px]">
+                  {order.statusTimeline.map((t, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <FiClock size={11} className="mt-0.5 text-slate-400 shrink-0" />
+                      <div className="flex-1">
+                        <span className="font-semibold text-slate-900 capitalize">{t.status.replace('_', ' ')}</span>
+                        {t.notes && <span className="text-slate-500"> · {t.notes}</span>}
+                      </div>
+                      <span className="text-slate-400 text-[10px]">{fmtDateTime(t.timestamp || t.at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
-          {/* Order Summary & Addresses */}
-          <div className="space-y-6">
-            {/* Order Summary */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
-              <h2 className="font-bold text-white mb-4">Order Summary</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between text-gray-400">
-                  <span>Subtotal</span>
-                  <span className="text-white">
-                    ${order.totals?.subtotal?.toFixed(2)}
-                  </span>
-                </div>
-                {order.totals?.discount > 0 && (
-                  <div className="flex justify-between text-green-400">
-                    <span>Discount</span>
-                    <span>-${order.totals.discount.toFixed(2)}</span>
-                  </div>
+          {/* RIGHT: summary + shipping + payment */}
+          <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 text-xs">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2.5">Summary</div>
+              <div className="space-y-1.5">
+                <Row label="Subtotal" value={fmtMoney(pricing.subtotal, currency)} />
+                {(pricing.discount > 0 || pricing.couponCode) && (
+                  <Row
+                    label={`Discount${pricing.couponCode ? ` (${pricing.couponCode})` : ''}`}
+                    value={`− ${fmtMoney(pricing.discount || 0, currency)}`}
+                    accent="text-emerald-600"
+                  />
                 )}
-                <div className="flex justify-between text-gray-400">
-                  <span>Tax</span>
-                  <span className="text-white">
-                    ${order.totals?.tax?.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Shipping</span>
-                  <span className="text-white">
-                    {order.totals?.shipping === 0
-                      ? "Free"
-                      : `$${order.totals?.shipping?.toFixed(2)}`}
-                  </span>
-                </div>
-                <hr className="border-slate-800" />
-                <div className="flex justify-between text-lg font-bold">
-                  <span className="text-white">Total</span>
-                  <span className="text-white">
-                    ${order.totals?.total?.toFixed(2)}
-                  </span>
+                <Row label="Tax" value={fmtMoney(pricing.tax || 0, currency)} />
+                <Row
+                  label="Shipping"
+                  value={pricing.shipping > 0 ? fmtMoney(pricing.shipping, currency) : 'Free'}
+                />
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-sm font-bold">
+                  <span>Total</span>
+                  <span>{fmtMoney(pricing.total, currency)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Shipping Address */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
-              <h2 className="font-bold text-white mb-4">Shipping Address</h2>
-              <div className="space-y-3 text-gray-400">
-                <div className="flex items-start gap-3">
-                  <FiMapPin className="text-gray-500 mt-1" size={16} />
+            <div className="bg-white rounded-xl border border-slate-200 p-4 text-xs">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Shipping to</div>
+              <div className="font-semibold text-slate-900">
+                {shippingAddr.firstName} {shippingAddr.lastName}
+              </div>
+              <div className="flex items-start gap-1.5 mt-1 text-slate-600">
+                <FiMapPin size={11} className="mt-0.5 text-slate-400 shrink-0" />
+                <div>
+                  {shippingAddr.street && <div>{shippingAddr.street}</div>}
                   <div>
-                    {order.shippingAddress?.street && (
-                      <p className="text-white">
-                        {order.shippingAddress.street}
-                        <br />
-                        {order.shippingAddress.city},{" "}
-                        {order.shippingAddress.state}{" "}
-                        {order.shippingAddress.zipCode}
-                        <br />
-                        {order.shippingAddress.country}
-                      </p>
-                    )}
+                    {[shippingAddr.city, shippingAddr.state, shippingAddr.postalCode].filter(Boolean).join(', ')}
                   </div>
+                  {shippingAddr.country && <div>{shippingAddr.country}</div>}
                 </div>
-                {order.shippingAddress?.phone && (
-                  <div className="flex items-center gap-3">
-                    <FiPhone className="text-gray-500" size={16} />
-                    <span className="text-white">
-                      {order.shippingAddress.phone}
-                    </span>
-                  </div>
-                )}
+              </div>
+              {shippingAddr.phone && (
+                <div className="flex items-center gap-1.5 mt-1 text-slate-600">
+                  <FiPhone size={11} className="text-slate-400 shrink-0" />
+                  <a href={`tel:${shippingAddr.phone}`} className="hover:text-slate-900">{shippingAddr.phone}</a>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-4 text-xs">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Payment</div>
+              <div className="flex items-center gap-2">
+                <FiCreditCard size={12} className="text-slate-400" />
+                <span className="font-semibold text-slate-900 uppercase">{(order.payment?.method || 'COD').replace('_', ' ')}</span>
+              </div>
+              <div className="mt-1 text-slate-500">
+                Status: <span className="font-semibold capitalize">{order.payment?.status || 'pending'}</span>
               </div>
             </div>
 
-            {/* Payment Method */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
-              <h2 className="font-bold text-white mb-4">Payment Method</h2>
-              <p className="text-gray-400 capitalize">
-                {order.payment?.method?.replace("_", " ") || "Credit Card"}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Status:{" "}
-                <span className="text-green-400 capitalize">
-                  {order.payment?.status || "paid"}
-                </span>
-              </p>
-            </div>
+            {order.shipping?.trackingNumber && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-blue-700">
+                  <FiTruck size={12} /> Tracking
+                </div>
+                <div className="mt-1 text-blue-900 font-mono">{order.shipping.trackingNumber}</div>
+                {order.shipping.carrier && <div className="text-[10px] text-blue-700 mt-0.5">via {order.shipping.carrier}</div>}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </section>
+    </>
+  );
+}
+
+function Row({ label, value, accent }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-slate-500">{label}</span>
+      <span className={`font-semibold ${accent || 'text-slate-900'}`}>{value}</span>
     </div>
   );
 }

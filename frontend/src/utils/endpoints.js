@@ -104,6 +104,8 @@ export const orderAPI = {
   getById: (id) => apiClient.get(`/orders/${id}`),
   updateStatus: (id, data) => apiClient.put(`/orders/${id}/status`, data),
   cancel: (id) => apiClient.put(`/orders/${id}/cancel`),
+  // Public tracking — no auth needed, matches orderNumber + email.
+  track: (data) => apiClient.post('/orders/track', data),
 };
 
 // Wishlist endpoints

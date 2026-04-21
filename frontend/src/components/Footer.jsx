@@ -120,6 +120,7 @@ export default function Footer() {
             <ul className="space-y-2">
               {[
                 { href: '/contact', label: t('footer.links.contact', 'Contact Us') },
+                { href: '/track-order', label: t('footer.links.trackOrder', 'Track My Order') },
                 { href: '/faq', label: t('footer.links.faq', 'FAQ') },
                 { href: '/shipping', label: t('footer.links.shipping', 'Shipping & Delivery') },
                 { href: '/returns', label: t('footer.links.returns', 'Returns & Exchanges') },

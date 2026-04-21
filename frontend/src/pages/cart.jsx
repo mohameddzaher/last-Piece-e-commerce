@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiArrowRight, FiTag, FiX } from 'react-icons/fi';
 import { useCartStore, useAuthStore } from '@/store';
-import { cartAPI } from '@/utils/endpoints';
+import { cartAPI, promoCodeAPI } from '@/utils/endpoints';
 import { toast } from 'react-toastify';
 
 export default function Cart() {
@@ -48,22 +48,30 @@ export default function Cart() {
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
+    if (!isAuthenticated) {
+      toast.warn('Please sign in to use promo codes');
+      return;
+    }
     setLoading(true);
     try {
-      // Simulate coupon validation
-      if (couponCode.toUpperCase() === 'SAVE10') {
-        setDiscount(total * 0.1);
-        setCouponApplied(true);
-        toast.success('Coupon applied! 10% discount');
-      } else if (couponCode.toUpperCase() === 'SAVE20') {
-        setDiscount(total * 0.2);
-        setCouponApplied(true);
-        toast.success('Coupon applied! 20% discount');
+      const res = await promoCodeAPI.validate({
+        code: couponCode.trim().toUpperCase(),
+        subtotal: total,
+      });
+      const data = res.data.data;
+      setDiscount(data.discount || 0);
+      setCouponApplied(true);
+      if (data.type === 'percent') {
+        toast.success(`Promo applied! ${data.value}% off`);
+      } else if (data.type === 'fixed') {
+        toast.success(`Promo applied! ${data.discount} EGP off`);
+      } else if (data.freeShipping) {
+        toast.success('Promo applied! Free shipping');
       } else {
-        toast.error('Invalid coupon code');
+        toast.success('Promo applied');
       }
     } catch (error) {
-      toast.error('Failed to apply coupon');
+      toast.error(error.response?.data?.message || 'Invalid promo code');
     } finally {
       setLoading(false);
     }
@@ -208,85 +216,83 @@ export default function Cart() {
             </div>
           </div>
 
-          {/* Order Summary */}
+          {/* Order Summary — compact */}
           <div className='lg:col-span-1'>
-            <div className='bg-slate-900 rounded-2xl border border-slate-800 p-6 sticky top-24'>
-              <h2 className='text-xl font-bold text-white mb-6'>Order Summary</h2>
+            <div className='bg-slate-900 rounded-xl border border-slate-800 p-4 sticky top-20'>
+              <h2 className='text-sm font-bold text-white mb-4'>Order Summary</h2>
 
               {/* Coupon */}
-              <div className='mb-6'>
+              <div className='mb-4'>
                 {couponApplied ? (
-                  <div className='flex items-center justify-between p-3 bg-green-500/10 border border-green-500/20 rounded-lg'>
-                    <div className='flex items-center gap-2'>
-                      <FiTag className='text-green-400' />
-                      <span className='text-green-400 font-medium'>{couponCode.toUpperCase()}</span>
+                  <div className='flex items-center justify-between p-2.5 bg-green-500/10 border border-green-500/20 rounded-lg'>
+                    <div className='flex items-center gap-1.5'>
+                      <FiTag className='text-green-400' size={12} />
+                      <span className='text-green-400 font-semibold text-xs'>{couponCode.toUpperCase()}</span>
                     </div>
-                    <button onClick={handleRemoveCoupon} className='text-green-400 hover:text-green-300'>
-                      <FiX size={18} />
+                    <button onClick={handleRemoveCoupon} className='text-green-400 hover:text-green-300' aria-label='Remove'>
+                      <FiX size={14} />
                     </button>
                   </div>
                 ) : (
-                  <div className='flex gap-2'>
+                  <div className='flex gap-1.5'>
                     <input
                       type='text'
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      placeholder='Coupon code'
-                      className='flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+                      placeholder='Promo code'
+                      className='flex-1 h-9 px-3 bg-slate-800 border border-slate-700 rounded-md text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
                     />
                     <button
                       onClick={handleApplyCoupon}
                       disabled={loading || !couponCode.trim()}
-                      className='px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50'
+                      className='h-9 px-3 bg-white hover:bg-gray-100 text-slate-900 rounded-md text-xs font-semibold disabled:opacity-50'
                     >
-                      Apply
+                      {loading ? '...' : 'Apply'}
                     </button>
                   </div>
                 )}
-                <p className='text-xs text-gray-500 mt-2'>Try: SAVE10 or SAVE20</p>
+                <p className='text-[10px] text-gray-500 mt-1.5'>Try: WELCOME10 · FIRSTPAIR500</p>
               </div>
 
               {/* Summary Details */}
-              <div className='space-y-3 mb-6'>
+              <div className='space-y-2 mb-4 text-xs'>
                 <div className='flex justify-between text-gray-400'>
                   <span>Subtotal</span>
-                  <span className='text-white'>${subtotal.toFixed(2)}</span>
+                  <span className='text-white'>EGP {subtotal.toLocaleString()}</span>
                 </div>
                 {discount > 0 && (
                   <div className='flex justify-between text-green-400'>
                     <span>Discount</span>
-                    <span>-${discount.toFixed(2)}</span>
+                    <span>− EGP {Math.round(discount).toLocaleString()}</span>
                   </div>
                 )}
                 <div className='flex justify-between text-gray-400'>
                   <span>Shipping</span>
-                  <span className='text-white'>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                  <span className='text-white'>{shipping === 0 ? 'Free' : `EGP ${shipping.toLocaleString()}`}</span>
                 </div>
-                {subtotal < 50 && (
-                  <p className='text-xs text-gray-500'>
-                    Add ${(50 - subtotal).toFixed(2)} more for free shipping
+                {subtotal > 0 && subtotal < 5000 && (
+                  <p className='text-[10px] text-gray-500'>
+                    Add EGP {(5000 - subtotal).toLocaleString()} more for free shipping
                   </p>
                 )}
                 <hr className='border-slate-800' />
-                <div className='flex justify-between text-lg font-bold'>
+                <div className='flex justify-between text-sm font-bold pt-1'>
                   <span className='text-white'>Total</span>
-                  <span className='text-white'>${finalTotal.toFixed(2)}</span>
+                  <span className='text-white'>EGP {Math.round(finalTotal).toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* Checkout Button */}
               <button
                 onClick={handleCheckout}
-                className='w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold transition-colors'
+                className='w-full h-10 flex items-center justify-center gap-1.5 bg-white hover:bg-gray-100 text-slate-900 rounded-full text-xs font-semibold'
               >
                 Proceed to Checkout
-                <FiArrowRight />
+                <FiArrowRight size={12} />
               </button>
 
-              {/* Continue Shopping */}
               <Link
                 href='/products'
-                className='block text-center text-gray-400 hover:text-white mt-4 transition-colors'
+                className='block text-center text-[11px] text-gray-400 hover:text-white mt-3'
               >
                 Continue Shopping
               </Link>
