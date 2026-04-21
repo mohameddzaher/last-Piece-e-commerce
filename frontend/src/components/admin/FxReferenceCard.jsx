@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
-  FiEdit2, FiDownloadCloud, FiClock, FiAlertCircle, FiCheck, FiX, FiHistory,
+  FiEdit2, FiDownloadCloud, FiClock, FiAlertCircle, FiCheck, FiX, FiRotateCcw,
 } from 'react-icons/fi';
 import { fxAPI } from '@/utils/endpoints';
 import { fmtDateTime } from '@/utils/format';
@@ -234,7 +234,7 @@ export default function FxReferenceCard({ pairs = [['SAR', 'EGP'], ['USD', 'EGP'
                   onClick={() => toggleHistory(from, to)}
                   className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
-                  <span className="inline-flex items-center gap-1"><FiHistory size={10} /> History</span>
+                  <span className="inline-flex items-center gap-1"><FiRotateCcw size={10} /> History</span>
                   <span>{expandedHistory === key ? '−' : '+'}</span>
                 </button>
                 {expandedHistory === key && (

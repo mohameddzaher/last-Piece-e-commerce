@@ -171,18 +171,30 @@ export default function Login() {
         </motion.div>
       </div>
 
-      {/* Right Side - Image/Design */}
-      <div className='hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 items-center justify-center p-8'>
-        <div className='text-center text-white'>
+      {/* Right Side — luxury sneaker backdrop with overlay */}
+      <div className='hidden lg:flex flex-1 relative items-center justify-center p-8 overflow-hidden'>
+        <img
+          src='https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=2000&q=85'
+          alt=''
+          className='absolute inset-0 w-full h-full object-cover'
+        />
+        <div className='absolute inset-0 bg-gradient-to-br from-slate-950/85 via-slate-950/70 to-slate-950/50' />
+        <div className='relative z-10 text-center text-white'>
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.6 }}
+            className='max-w-sm mx-auto'
           >
-            <div className='text-6xl mb-6'>✨</div>
-            <h2 className='text-2xl font-bold mb-3'>Discover Unique Pieces</h2>
-            <p className='text-sm text-white/80 max-w-xs'>
-              Join thousands of collectors finding one-of-a-kind items every day
+            <div className='inline-flex items-center gap-1.5 px-3 py-1 mb-5 rounded-full bg-white/10 backdrop-blur border border-white/20 text-[10px] font-bold uppercase tracking-widest'>
+              <span className='w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse' />
+              Khaleeji Luxury · Now in Egypt
+            </div>
+            <h2 className='text-3xl font-bold mb-3 leading-tight'>
+              Discover Unique Pieces
+            </h2>
+            <p className='text-sm text-gray-200/90 leading-relaxed'>
+              Every pair is one of one in our boutique. Join thousands of collectors finding one-of-a-kind pairs every day.
             </p>
           </motion.div>
         </div>
