@@ -38,8 +38,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['customer', 'admin', 'super-admin'],
+      enum: ['customer', 'admin', 'super-admin', 'saudi-staff', 'egypt-staff'],
       default: 'customer',
+    },
+    workLocation: {
+      type: String,
+      enum: ['saudi', 'egypt', null],
+      default: null,
     },
     status: {
       type: String,

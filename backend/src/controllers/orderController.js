@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import { generateOrderNumber } from '../utils/helpers.js';
 import { sendOrderConfirmation, sendOrderStatusUpdate } from '../utils/email.js';
 import { calculatePagination } from '../utils/helpers.js';
+import { emitOrderChange, emitDashboardRefresh } from '../realtime/io.js';
 
 export const createOrder = async (req, res, next) => {
   try {
@@ -77,6 +78,9 @@ export const createOrder = async (req, res, next) => {
     user.metadata.totalSpent += order.pricing.total;
     user.metadata.averageOrderValue = user.metadata.totalSpent / user.metadata.totalOrders;
     await user.save();
+
+    emitOrderChange('order:created', order, req.user.id);
+    emitDashboardRefresh();
 
     res.status(201).json({
       success: true,
@@ -181,6 +185,9 @@ export const updateOrderStatus = async (req, res, next) => {
     const user = await User.findById(order.userId);
     await sendOrderStatusUpdate(user.email, order, status);
 
+    emitOrderChange('order:status-changed', order, order.userId);
+    emitDashboardRefresh();
+
     res.status(200).json({
       success: true,
       message: 'Order status updated',
@@ -223,6 +230,9 @@ export const cancelOrder = async (req, res, next) => {
     // Send cancellation email
     const user = await User.findById(order.userId);
     await sendOrderStatusUpdate(user.email, order, 'cancelled');
+
+    emitOrderChange('order:status-changed', order, order.userId);
+    emitDashboardRefresh();
 
     res.status(200).json({
       success: true,

@@ -1,648 +1,660 @@
+'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import AdminLayout from '@/components/admin/AdminLayout';
+import StatCard from '@/components/admin/StatCard';
+import FxRateCard from '@/components/admin/FxRateCard';
+import FxImpactCard from '@/components/admin/FxImpactCard';
+import FxReferenceCard from '@/components/admin/FxReferenceCard';
 import {
-  FiHome,
-  FiPackage,
-  FiUsers,
-  FiShoppingBag,
-  FiDollarSign,
-  FiTrendingUp,
-  FiArrowUp,
-  FiArrowDown,
-  FiEye,
-  FiClock,
-  FiCheckCircle,
-  FiXCircle,
-  FiTruck,
-  FiMenu,
-  FiX,
-  FiLogOut,
-  FiSettings,
-  FiPlus,
-  FiDownload,
-  FiStar,
-  FiBarChart2,
-  FiPieChart,
-  FiAlertTriangle,
+  FiPackage, FiShoppingBag, FiDollarSign, FiTrendingUp, FiArchive, FiTruck,
+  FiCloud, FiAlertTriangle, FiRefreshCw, FiTrendingDown, FiUsers,
+  FiShoppingCart, FiPercent, FiActivity, FiZap,
 } from 'react-icons/fi';
+import {
+  productAPI, expenseAPI, saleAPI, adminAPI, promoCodeAPI,
+} from '@/utils/endpoints';
 import { useAuthStore } from '@/store';
-import { adminAPI } from '@/utils/endpoints';
-import { toast } from 'react-toastify';
+import { useSocketEvent } from '@/utils/socket';
+import { fmtMoney, fmtPct, fmtDate, fmtDateTime } from '@/utils/format';
 
-const statusColors = {
-  pending: 'bg-yellow-500/10 text-yellow-500',
-  processing: 'bg-blue-500/10 text-blue-500',
-  shipped: 'bg-purple-500/10 text-purple-500',
-  delivered: 'bg-green-500/10 text-green-500',
-  cancelled: 'bg-red-500/10 text-red-500',
+/* ---------- helpers ---------- */
+
+const toEGP = (amount, currency) => {
+  if (!amount) return 0;
+  if (!currency || currency === 'EGP') return amount;
+  if (currency === 'SAR') return amount * 13.25;
+  if (currency === 'USD') return amount * 49;
+  return amount;
 };
 
-const statusIcons = {
-  pending: FiClock,
-  processing: FiPackage,
-  shipped: FiTruck,
-  delivered: FiCheckCircle,
-  cancelled: FiXCircle,
+const startOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
 };
+
+const periodToDays = { '7d': 7, '30d': 30, '90d': 90, all: null };
+
+const inPeriod = (date, days) => {
+  if (days == null) return true;
+  const cutoff = Date.now() - days * 86400000;
+  return new Date(date).getTime() >= cutoff;
+};
+
+/* ---------- page ---------- */
 
 export default function AdminDashboard() {
-  const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const role = user?.role;
+  const [period, setPeriod] = useState('30d');
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalOrders: 0,
-    totalProducts: 0,
-    totalRevenue: 0,
+
+  // Raw datasets (role-filtered by the backend already).
+  const [inventory, setInventory] = useState({
+    saudi: [], transit: [], online: [], offline: [],
   });
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [ordersByStatus, setOrdersByStatus] = useState([]);
-  const [superAdminStats, setSuperAdminStats] = useState(null);
-  const [exporting, setExporting] = useState({
-    products: false,
-    users: false,
-    orders: false,
-  });
+  const [sales, setSales] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [promos, setPromos] = useState([]);
+  const [userCount, setUserCount] = useState(0);
 
-  const isSuperAdmin = user?.role === 'super-admin';
+  const isSuper = role === 'super-admin' || role === 'admin';
+  const isSaudi = role === 'saudi-staff';
+  const isEgypt = role === 'egypt-staff';
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    if (user?.role !== 'admin' && user?.role !== 'super-admin') {
-      router.push('/dashboard');
-      toast.error('Access denied. Admin privileges required.');
-      return;
-    }
-
-    fetchDashboardData();
-  }, [isAuthenticated, user, router]);
-
-  const fetchDashboardData = async () => {
+  const load = async () => {
     try {
-      const res = await adminAPI.getStats();
-      if (res.data.success) {
-        setStats(res.data.data.stats);
-        setRecentOrders(res.data.data.recentOrders || []);
-        setOrdersByStatus(res.data.data.ordersByStatus || []);
-      }
-
-      // Fetch super admin stats if user is super-admin
-      if (user?.role === 'super-admin') {
-        try {
-          const superRes = await adminAPI.getSuperAdminStats();
-          if (superRes.data.success) {
-            setSuperAdminStats(superRes.data.data);
-          }
-        } catch (err) {
-          console.error('Error fetching super admin stats:', err);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      const [sa, tr, on, of, salesRes, orderRes, expRes, promoRes, statsRes] = await Promise.all([
+        (isSuper || isSaudi) ? productAPI.getInventory('saudi').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        (isSuper || isSaudi) ? productAPI.getInventory('transit').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        (isSuper || isEgypt) ? productAPI.getInventory('egypt-online').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        (isSuper || isEgypt) ? productAPI.getInventory('egypt-offline').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        saleAPI.getAll({ limit: 1000 }).catch(() => ({ data: { data: [] } })),
+        isSuper ? adminAPI.getOrders({ limit: 1000 }).catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        isSuper ? expenseAPI.getAll({ limit: 1000 }).catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        isSuper ? promoCodeAPI.getAll().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+        isSuper ? adminAPI.getStats().catch(() => ({ data: { data: {} } })) : Promise.resolve({ data: { data: {} } }),
+      ]);
+      setInventory({
+        saudi: sa.data.data || [],
+        transit: tr.data.data || [],
+        online: on.data.data || [],
+        offline: of.data.data || [],
+      });
+      setSales(salesRes.data.data || []);
+      setOrders(orderRes.data.data || []);
+      setExpenses(expRes.data.data || []);
+      setPromos(promoRes.data.data || []);
+      setUserCount(statsRes.data?.data?.totalUsers || 0);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExport = async (type) => {
-    setExporting(prev => ({ ...prev, [type]: true }));
-    try {
-      let response;
-      let filename;
+  useEffect(() => { if (role) load(); }, [role]);
+  useSocketEvent('dashboard:refresh', () => load(), [role]);
+  useSocketEvent('product:created', () => load(), [role]);
+  useSocketEvent('product:updated', () => load(), [role]);
+  useSocketEvent('sale:created', () => load(), [role]);
+  useSocketEvent('order:created', () => load(), [role]);
+  useSocketEvent('expense:created', () => load(), [role]);
 
-      switch (type) {
-        case 'products':
-          response = await adminAPI.exportProducts();
-          filename = 'products.xlsx';
-          break;
-        case 'users':
-          response = await adminAPI.exportUsers();
-          filename = 'users.xlsx';
-          break;
-        case 'orders':
-          response = await adminAPI.exportOrders();
-          filename = 'orders.xlsx';
-          break;
-        default:
-          return;
-      }
+  /* ---------- derived analytics ---------- */
 
-      // Create blob and download
-      const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+  const a = useMemo(() => {
+    const days = periodToDays[period];
 
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} exported successfully!`);
-    } catch (error) {
-      console.error(`Error exporting ${type}:`, error);
-      toast.error(`Failed to export ${type}`);
-    } finally {
-      setExporting(prev => ({ ...prev, [type]: false }));
-    }
-  };
+    // Filter transactions to period
+    const salesP = sales.filter((s) => inPeriod(s.createdAt, days));
+    const ordersP = orders.filter((o) => inPeriod(o.createdAt, days));
+    const paidOrdersP = ordersP.filter((o) => ['completed', 'delivered'].includes(o.payment?.status) || ['delivered'].includes(o.status));
 
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
+    // Revenue by channel (in EGP)
+    const offlineRevenue = salesP.reduce((s, x) => s + (x.total || 0), 0);
+    const onlineRevenue = paidOrdersP.reduce((s, x) => s + (x.pricing?.total || 0), 0);
+    const totalRevenue = offlineRevenue + onlineRevenue;
 
-  const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: FiHome, current: true },
-    { name: 'Products', href: '/admin/products', icon: FiPackage, current: false },
-    { name: 'Orders', href: '/admin/orders', icon: FiShoppingBag, current: false },
-    { name: 'Users', href: '/admin/users', icon: FiUsers, current: false },
-    { name: 'Reviews', href: '/admin/reviews', icon: FiStar, current: false },
-    ...(isSuperAdmin ? [
-      { name: 'Financial Report', href: '/admin/financial', icon: FiBarChart2, current: false, superAdminOnly: true },
-      { name: 'Settings', href: '/admin/settings', icon: FiSettings, current: false, superAdminOnly: true },
-    ] : []),
-  ];
+    const totalCOGS = salesP.reduce((s, x) => s + (x.totalCost || 0), 0);
+    const grossProfit = salesP.reduce((s, x) => s + (x.totalProfit || 0), 0);
 
-  const statCards = [
-    {
-      title: 'Total Revenue',
-      value: `$${stats.totalRevenue?.toLocaleString() || 0}`,
-      icon: FiDollarSign,
-      color: 'from-green-500 to-emerald-600',
-      subtext: isSuperAdmin && superAdminStats?.overview?.pendingRevenue
-        ? `$${superAdminStats.overview.pendingRevenue.toLocaleString()} pending`
-        : null,
-    },
-    {
-      title: 'Total Orders',
-      value: stats.totalOrders?.toLocaleString() || 0,
-      icon: FiShoppingBag,
-      color: 'from-blue-500 to-indigo-600',
-      subtext: isSuperAdmin && superAdminStats?.overview?.newOrdersThisMonth
-        ? `${superAdminStats.overview.newOrdersThisMonth} this month`
-        : null,
-    },
-    {
-      title: 'Total Products',
-      value: stats.totalProducts?.toLocaleString() || 0,
-      icon: FiPackage,
-      color: 'from-purple-500 to-pink-600',
-      subtext: isSuperAdmin && superAdminStats?.overview?.lowStockProducts
-        ? `${superAdminStats.overview.lowStockProducts} low stock`
-        : null,
-      alertCount: superAdminStats?.overview?.lowStockProducts,
-    },
-    {
-      title: 'Total Users',
-      value: stats.totalUsers?.toLocaleString() || 0,
-      icon: FiUsers,
-      color: 'from-orange-500 to-red-600',
-      subtext: isSuperAdmin && superAdminStats?.overview?.newUsersThisMonth
-        ? `${superAdminStats.overview.newUsersThisMonth} this month`
-        : null,
-    },
-  ];
+    const expensesP = expenses.filter((x) => inPeriod(x.incurredOn || x.createdAt, days));
+    const opex = expensesP.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP'), 0);
+    const netProfit = grossProfit - opex;
 
-  if (loading) {
-    return (
-      <div className='min-h-screen bg-slate-950 flex items-center justify-center'>
-        <div className='w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
-      </div>
+    const txnCount = salesP.length + ordersP.length;
+    const aov = txnCount > 0 ? totalRevenue / txnCount : 0;
+    const marginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    // Month-over-month (last 30 vs prior 30)
+    const now = Date.now();
+    const monthMs = 30 * 86400000;
+    const cur = sales.filter((s) => now - new Date(s.createdAt).getTime() < monthMs);
+    const prev = sales.filter((s) => {
+      const delta = now - new Date(s.createdAt).getTime();
+      return delta >= monthMs && delta < 2 * monthMs;
+    });
+    const curRev = cur.reduce((s, x) => s + (x.total || 0), 0);
+    const prevRev = prev.reduce((s, x) => s + (x.total || 0), 0);
+    const mom = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : curRev > 0 ? 100 : 0;
+
+    // Inventory value at landed cost (SAR → EGP)
+    const allInventory = [
+      ...inventory.saudi, ...inventory.transit, ...inventory.online, ...inventory.offline,
+    ];
+    const inventoryValue = allInventory.reduce(
+      (s, p) => s + toEGP(p.landedCost || p.purchasePrice || 0, p.purchaseCurrency || 'SAR'),
+      0,
     );
-  }
+
+    // Top products by revenue (from offline sales items)
+    const topProductMap = {};
+    for (const s of salesP) {
+      for (const it of (s.items || [])) {
+        const id = String(it.product || it.productId || '');
+        if (!id) continue;
+        if (!topProductMap[id]) {
+          topProductMap[id] = { id, name: it.productName || '—', revenue: 0, units: 0 };
+        }
+        topProductMap[id].revenue += it.sellPrice || 0;
+        topProductMap[id].units += 1;
+      }
+    }
+    // Also count online orders
+    for (const o of paidOrdersP) {
+      for (const it of (o.items || [])) {
+        const id = String(it.productId || '');
+        if (!id) continue;
+        if (!topProductMap[id]) {
+          topProductMap[id] = { id, name: it.productName || '—', revenue: 0, units: 0 };
+        }
+        topProductMap[id].revenue += (it.subtotal || (it.price * (it.quantity || 1)) || 0);
+        topProductMap[id].units += it.quantity || 1;
+      }
+    }
+    const topProducts = Object.values(topProductMap).sort((x, y) => y.revenue - x.revenue).slice(0, 5);
+
+    // Top brands from inventory (most of the sold products share brand data)
+    const brandMap = {};
+    for (const p of allInventory) {
+      const name = p.brandRef?.name || p.brand || '—';
+      if (!brandMap[name]) brandMap[name] = { name, units: 0, value: 0 };
+      brandMap[name].units += 1;
+      brandMap[name].value += toEGP(p.landedCost || p.purchasePrice || 0, p.purchaseCurrency || 'SAR');
+    }
+    const topBrands = Object.values(brandMap).sort((x, y) => y.value - x.value).slice(0, 5);
+
+    // Revenue by day — last 14 days
+    const series = [];
+    for (let i = 13; i >= 0; i--) {
+      const day = startOfDay(Date.now() - i * 86400000);
+      const next = new Date(day.getTime() + 86400000);
+      const revToday = salesP
+        .filter((s) => { const t = new Date(s.createdAt); return t >= day && t < next; })
+        .reduce((s, x) => s + (x.total || 0), 0)
+        + paidOrdersP
+          .filter((o) => { const t = new Date(o.createdAt); return t >= day && t < next; })
+          .reduce((s, x) => s + (x.pricing?.total || 0), 0);
+      series.push({ date: day, revenue: revToday });
+    }
+
+    // Expenses by category
+    const expCat = {};
+    for (const e of expensesP) {
+      const c = e.category || 'other';
+      if (!expCat[c]) expCat[c] = 0;
+      expCat[c] += toEGP(e.amount || 0, e.currency || 'EGP');
+    }
+    const expByCategory = Object.entries(expCat).map(([k, v]) => ({ category: k, amount: v })).sort((x, y) => y.amount - x.amount);
+
+    // Recent activity (union of sales, orders, both sorted by createdAt desc)
+    const activity = [
+      ...salesP.map((s) => ({
+        type: 'sale',
+        when: s.createdAt,
+        title: `Boutique sale · ${s.items?.[0]?.productName || '—'}${s.items?.length > 1 ? ` +${s.items.length - 1}` : ''}`,
+        value: s.total,
+        currency: s.currency || 'EGP',
+      })),
+      ...ordersP.map((o) => ({
+        type: 'order',
+        when: o.createdAt,
+        title: `Online order · ${o.orderNumber}`,
+        value: o.pricing?.total,
+        currency: o.payment?.currency || 'EGP',
+      })),
+    ].sort((x, y) => new Date(y.when) - new Date(x.when)).slice(0, 10);
+
+    // Alerts
+    const alerts = [];
+    const staleCutoff = Date.now() - 60 * 86400000;
+    const stale = allInventory.filter((p) =>
+      p.location !== 'sold' && new Date(p.createdAt).getTime() < staleCutoff,
+    ).length;
+    if (stale > 0) alerts.push({ level: 'warn', msg: `${stale} product${stale > 1 ? 's' : ''} older than 60 days and still in stock` });
+    const lowPrice = allInventory.filter((p) =>
+      p.minSellPrice > 0 && p.landedCost &&
+      p.minSellPrice < toEGP(p.landedCost, p.purchaseCurrency || 'SAR'),
+    ).length;
+    if (lowPrice > 0) alerts.push({ level: 'warn', msg: `${lowPrice} product${lowPrice > 1 ? 's' : ''} have a minimum sell price below landed cost` });
+    const expiringPromos = promos.filter((p) => {
+      if (!p.expiresAt) return false;
+      const d = new Date(p.expiresAt).getTime() - Date.now();
+      return d > 0 && d < 7 * 86400000;
+    }).length;
+    if (expiringPromos > 0) alerts.push({ level: 'info', msg: `${expiringPromos} promo code${expiringPromos > 1 ? 's' : ''} expire within 7 days` });
+
+    return {
+      totalRevenue, onlineRevenue, offlineRevenue,
+      totalCOGS, grossProfit, opex, netProfit,
+      txnCount, aov, marginPct, mom,
+      inventoryValue,
+      counts: {
+        saudi: inventory.saudi.length,
+        transit: inventory.transit.length,
+        online: inventory.online.length,
+        offline: inventory.offline.length,
+      },
+      topProducts, topBrands, series, expByCategory,
+      activity, alerts,
+      onlineOrderCount: ordersP.length,
+      offlineSaleCount: salesP.length,
+      paidOrderCount: paidOrdersP.length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, orders, expenses, inventory, promos, period]);
+
+  const maxSeries = Math.max(1, ...a.series.map((d) => d.revenue));
 
   return (
-    <div className='min-h-screen bg-slate-950'>
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className='fixed inset-0 bg-black/50 z-40 lg:hidden'
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className='flex flex-col h-full'>
-          {/* Logo */}
-          <div className='flex items-center justify-between px-6 py-5 border-b border-slate-800'>
-            <Link href='/admin' className='flex items-center gap-2'>
-              <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center'>
-                <span className='text-white font-bold text-xl'>L</span>
-              </div>
-              <span className='text-xl font-bold text-white'>Admin</span>
-            </Link>
-            <button onClick={() => setSidebarOpen(false)} className='lg:hidden text-gray-400 hover:text-white'>
-              <FiX size={24} />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className='flex-1 px-4 py-6 space-y-1'>
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    item.current
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:bg-slate-800 hover:text-white'
+    <AdminLayout
+      title="Dashboard"
+      actions={
+        isSuper && (
+          <div className="flex items-center gap-2">
+            <div className="inline-flex bg-slate-100 dark:bg-slate-800 rounded-full p-0.5">
+              {['7d', '30d', '90d', 'all'].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-3 py-1 text-[10px] font-semibold uppercase rounded-full transition-colors ${
+                    period === p ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow' : 'text-slate-500'
                   }`}
                 >
-                  <Icon size={20} />
-                  <span className='font-medium'>{item.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* User Info */}
-          <div className='p-4 border-t border-slate-800'>
-            <div className='flex items-center gap-3 px-4 py-3'>
-              <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center'>
-                <span className='text-white font-bold'>
-                  {user?.firstName?.[0]}{user?.lastName?.[0]}
-                </span>
-              </div>
-              <div className='flex-1'>
-                <p className='text-white font-medium text-sm'>
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className='text-gray-500 text-xs'>{user?.role}</p>
-              </div>
+                  {p === 'all' ? 'All' : `Last ${p}`}
+                </button>
+              ))}
             </div>
             <button
-              onClick={handleLogout}
-              className='flex items-center gap-3 w-full px-4 py-3 text-gray-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-all mt-2'
+              onClick={load}
+              className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900"
+              title="Refresh"
             >
-              <FiLogOut size={20} />
-              <span className='font-medium'>Logout</span>
+              <FiRefreshCw size={12} />
             </button>
           </div>
+        )
+      }
+    >
+      <div className="mb-5">
+        <h2 className="text-lg font-bold">Welcome back, {user?.firstName}.</h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {isSuper && 'Live numbers across everything — updated in real time.'}
+          {isSaudi && 'Your Saudi inventory at a glance.'}
+          {isEgypt && 'Your Egypt inventory and sales.'}
+        </p>
+      </div>
+
+      {/* Alerts row */}
+      {isSuper && a.alerts.length > 0 && (
+        <div className="mb-5 space-y-1.5">
+          {a.alerts.map((al, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                al.level === 'warn'
+                  ? 'bg-amber-500/10 text-amber-700 border border-amber-500/30'
+                  : 'bg-blue-500/10 text-blue-700 border border-blue-500/30'
+              }`}
+            >
+              <FiAlertTriangle size={12} /> {al.msg}
+            </div>
+          ))}
         </div>
-      </aside>
+      )}
 
-      {/* Main Content */}
-      <div className='lg:pl-64'>
-        {/* Top Bar */}
-        <header className='sticky top-0 z-30 bg-slate-950/80 backdrop-blur-sm border-b border-slate-800'>
-          <div className='flex items-center justify-between px-4 lg:px-8 py-4'>
-            <div className='flex items-center gap-4'>
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className='lg:hidden text-gray-400 hover:text-white'
-              >
-                <FiMenu size={24} />
-              </button>
+      {/* Inventory counts */}
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Inventory</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {(isSuper || isSaudi) && (
+          <StatCard label="Saudi Inventory" value={a.counts.saudi} icon={FiArchive} accent="amber" />
+        )}
+        {(isSuper || isSaudi) && (
+          <StatCard label="In Transit" value={a.counts.transit} icon={FiTruck} accent="blue" />
+        )}
+        {(isSuper || isEgypt) && (
+          <StatCard label="Egypt — Online" value={a.counts.online} icon={FiCloud} accent="emerald" />
+        )}
+        {(isSuper || isEgypt) && (
+          <StatCard label="Egypt — Boutique" value={a.counts.offline} icon={FiShoppingBag} accent="purple" />
+        )}
+      </div>
+
+      {isSuper && (
+        <>
+          {/* Financial KPI row */}
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+            Business performance · {period === 'all' ? 'all-time' : `last ${period}`}
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <StatCard
+              label="Revenue"
+              value={fmtMoney(a.totalRevenue)}
+              sub={<MoMTag value={a.mom} />}
+              icon={FiDollarSign}
+              accent="emerald"
+            />
+            <StatCard
+              label="Gross Profit"
+              value={fmtMoney(a.grossProfit)}
+              sub={`Margin ${fmtPct(a.marginPct)}`}
+              icon={FiTrendingUp}
+              accent="blue"
+            />
+            <StatCard
+              label="Operating Expenses"
+              value={fmtMoney(a.opex)}
+              sub={`${a.txnCount} transactions`}
+              icon={FiAlertTriangle}
+              accent="rose"
+            />
+            <StatCard
+              label="Avg Order Value"
+              value={fmtMoney(a.aov)}
+              sub={`${a.txnCount} txns`}
+              icon={FiShoppingCart}
+              accent="purple"
+            />
+          </div>
+
+          {/* Net profit hero */}
+          <div className={`rounded-xl p-5 text-white mb-6 ${
+            a.netProfit >= 0
+              ? 'bg-gradient-to-br from-emerald-500 to-emerald-600'
+              : 'bg-gradient-to-br from-rose-500 to-rose-600'
+          }`}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <h1 className='text-xl font-bold text-white'>Dashboard</h1>
-                <p className='text-sm text-gray-400'>Welcome back, {user?.firstName}!</p>
+                <div className="text-xs font-semibold uppercase tracking-wider opacity-80">Net Profit</div>
+                <div className="text-3xl font-bold mt-1">{fmtMoney(a.netProfit)}</div>
+                <div className="text-[11px] opacity-80 mt-1">Gross − Operating Expenses</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wider opacity-70">Inventory Value</div>
+                <div className="text-lg font-bold">{fmtMoney(a.inventoryValue)}</div>
+                <div className="text-[10px] opacity-70 mt-0.5">Landed cost, EGP</div>
               </div>
             </div>
-
-            <div className='flex items-center gap-4'>
-              <Link
-                href='/admin/products/new'
-                className='flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors'
-              >
-                <FiPlus size={18} />
-                <span className='hidden sm:inline'>Add Product</span>
-              </Link>
-              <Link
-                href='/'
-                className='text-gray-400 hover:text-white transition-colors'
-              >
-                <FiEye size={20} />
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        {/* Dashboard Content */}
-        <main className='p-4 lg:p-8'>
-          {/* Stats Grid */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
-            {statCards.map((stat, idx) => {
-              const Icon = stat.icon;
-              return (
-                <motion.div
-                  key={stat.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className='bg-slate-900 border border-slate-800 rounded-2xl p-6 relative'
-                >
-                  {stat.alertCount > 0 && (
-                    <div className='absolute top-4 right-4'>
-                      <span className='flex items-center gap-1 px-2 py-1 bg-yellow-500/10 text-yellow-500 rounded-full text-xs'>
-                        <FiAlertTriangle size={12} />
-                        {stat.alertCount}
-                      </span>
-                    </div>
-                  )}
-                  <div className='flex items-center justify-between mb-4'>
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                      <Icon className='text-white' size={24} />
-                    </div>
-                  </div>
-                  <h3 className='text-gray-400 text-sm mb-1'>{stat.title}</h3>
-                  <p className='text-2xl font-bold text-white'>{stat.value}</p>
-                  {stat.subtext && (
-                    <p className='text-xs text-gray-500 mt-1'>{stat.subtext}</p>
-                  )}
-                </motion.div>
-              );
-            })}
           </div>
 
-          <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-            {/* Recent Orders */}
-            <div className='lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6'>
-              <div className='flex items-center justify-between mb-6'>
-                <h2 className='text-lg font-bold text-white'>Recent Orders</h2>
-                <Link
-                  href='/admin/orders'
-                  className='text-blue-400 hover:text-blue-300 text-sm font-medium'
-                >
-                  View All
-                </Link>
+          {/* Channel split + secondary KPIs */}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3 mb-6">
+            {/* Revenue bar chart */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Revenue — last 14 days</h4>
+                  <div className="text-[11px] text-slate-500">Daily totals across online + boutique</div>
+                </div>
+                <FiActivity size={14} className="text-slate-400" />
               </div>
-
-              {recentOrders.length > 0 ? (
-                <div className='space-y-4'>
-                  {recentOrders.map((order) => {
-                    const StatusIcon = statusIcons[order.status] || FiClock;
-                    return (
+              <div className="flex items-end gap-1 h-32">
+                {a.series.map((d, i) => {
+                  const pct = maxSeries > 0 ? (d.revenue / maxSeries) * 100 : 0;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 group min-w-0">
                       <div
-                        key={order._id}
-                        className='flex items-center justify-between p-4 bg-slate-800/50 rounded-xl'
+                        className="w-full rounded-t bg-gradient-to-t from-blue-500 to-blue-400 relative group-hover:from-blue-600 group-hover:to-blue-500"
+                        style={{ height: `${Math.max(pct, 2)}%` }}
                       >
-                        <div className='flex items-center gap-4'>
-                          <div className='w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center'>
-                            <FiShoppingBag className='text-gray-400' size={18} />
+                        {d.revenue > 0 && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-900 text-white text-[9px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                            {fmtMoney(d.revenue)}
                           </div>
-                          <div>
-                            <p className='text-white font-medium'>
-                              #{order.orderNumber || order._id.slice(-8)}
-                            </p>
-                            <p className='text-gray-500 text-sm'>
-                              {order.userId?.firstName} {order.userId?.lastName}
-                            </p>
-                          </div>
-                        </div>
-                        <div className='text-right'>
-                          <p className='text-white font-medium'>
-                            ${order.pricing?.total?.toFixed(2)}
-                          </p>
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                              statusColors[order.status]
-                            }`}
-                          >
-                            <StatusIcon size={12} />
-                            {order.status}
-                          </span>
-                        </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="text-[8px] text-slate-400 whitespace-nowrap">
+                        {d.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Channel revenue split */}
+            <div className="space-y-3">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Revenue by channel</h4>
+                <ChannelRow
+                  icon={FiCloud}
+                  label="Online"
+                  color="text-emerald-600 bg-emerald-500/10"
+                  revenue={a.onlineRevenue}
+                  count={a.onlineOrderCount}
+                  total={a.totalRevenue}
+                />
+                <ChannelRow
+                  icon={FiShoppingBag}
+                  label="Boutique"
+                  color="text-purple-600 bg-purple-500/10"
+                  revenue={a.offlineRevenue}
+                  count={a.offlineSaleCount}
+                  total={a.totalRevenue}
+                />
+              </div>
+              <StatCard label="Total customers" value={userCount} icon={FiUsers} accent="blue" />
+              <FxReferenceCard />
+              <FxRateCard />
+              <FxImpactCard />
+            </div>
+          </div>
+
+          {/* Top products + top brands */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Top products by revenue</h4>
+                <Link href="/admin/products" className="text-[10px] text-blue-500 hover:text-blue-600 font-semibold">All →</Link>
+              </div>
+              {a.topProducts.length === 0 ? (
+                <div className="text-[11px] text-slate-400 py-4 text-center">No sales yet in this period.</div>
               ) : (
-                <div className='text-center py-8'>
-                  <FiShoppingBag className='mx-auto text-gray-600 mb-3' size={40} />
-                  <p className='text-gray-400'>No orders yet</p>
-                </div>
+                <TopList
+                  items={a.topProducts}
+                  maxValue={a.topProducts[0]?.revenue || 1}
+                  formatRight={(p) => fmtMoney(p.revenue)}
+                  formatSub={(p) => `${p.units} unit${p.units > 1 ? 's' : ''}`}
+                />
               )}
             </div>
 
-            {/* Orders by Status */}
-            <div className='bg-slate-900 border border-slate-800 rounded-2xl p-6'>
-              <h2 className='text-lg font-bold text-white mb-6'>Orders by Status</h2>
-
-              {ordersByStatus.length > 0 ? (
-                <div className='space-y-4'>
-                  {ordersByStatus.map((item) => {
-                    const StatusIcon = statusIcons[item._id] || FiClock;
-                    const totalOrders = ordersByStatus.reduce((sum, o) => sum + o.count, 0);
-                    const percentage = totalOrders > 0 ? (item.count / totalOrders) * 100 : 0;
-
-                    return (
-                      <div key={item._id} className='space-y-2'>
-                        <div className='flex items-center justify-between'>
-                          <span className={`flex items-center gap-2 ${statusColors[item._id]?.replace('bg-', 'text-').split(' ')[1] || 'text-gray-400'}`}>
-                            <StatusIcon size={16} />
-                            <span className='capitalize'>{item._id}</span>
-                          </span>
-                          <span className='text-white font-medium'>{item.count}</span>
-                        </div>
-                        <div className='h-2 bg-slate-800 rounded-full overflow-hidden'>
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              item._id === 'delivered'
-                                ? 'bg-green-500'
-                                : item._id === 'cancelled'
-                                ? 'bg-red-500'
-                                : item._id === 'shipped'
-                                ? 'bg-purple-500'
-                                : item._id === 'processing'
-                                ? 'bg-blue-500'
-                                : 'bg-yellow-500'
-                            }`}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Top brands by inventory value</h4>
+                <Link href="/admin/brands" className="text-[10px] text-blue-500 hover:text-blue-600 font-semibold">All →</Link>
+              </div>
+              {a.topBrands.length === 0 ? (
+                <div className="text-[11px] text-slate-400 py-4 text-center">No inventory yet.</div>
               ) : (
-                <div className='text-center py-8'>
-                  <FiTrendingUp className='mx-auto text-gray-600 mb-3' size={40} />
-                  <p className='text-gray-400'>No data available</p>
-                </div>
+                <TopList
+                  items={a.topBrands.map((b) => ({ id: b.name, name: b.name, revenue: b.value, units: b.units }))}
+                  maxValue={a.topBrands[0]?.value || 1}
+                  formatRight={(b) => fmtMoney(b.revenue)}
+                  formatSub={(b) => `${b.units} pair${b.units > 1 ? 's' : ''}`}
+                />
               )}
             </div>
           </div>
 
-          {/* Super Admin Section - Export Data */}
-          {isSuperAdmin && (
-            <div className='mt-8'>
-              <div className='bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/20 rounded-2xl p-6'>
-                <div className='flex items-center gap-3 mb-6'>
-                  <div className='w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center'>
-                    <FiDownload className='text-purple-400' size={20} />
-                  </div>
-                  <div>
-                    <h2 className='text-lg font-bold text-white'>Export Data</h2>
-                    <p className='text-sm text-gray-400'>Super Admin Only - Download data as Excel files</p>
-                  </div>
-                </div>
-
-                <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-                  <button
-                    onClick={() => handleExport('products')}
-                    disabled={exporting.products}
-                    className='flex items-center gap-3 p-4 bg-slate-900/50 border border-slate-700 rounded-xl hover:border-purple-500/50 transition-colors disabled:opacity-50'
-                  >
-                    <FiPackage className='text-purple-400' size={20} />
-                    <div className='text-left'>
-                      <p className='text-white font-medium'>Products</p>
-                      <p className='text-gray-500 text-xs'>Export all products</p>
-                    </div>
-                    {exporting.products ? (
-                      <div className='ml-auto w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin' />
-                    ) : (
-                      <FiDownload className='ml-auto text-gray-500' size={18} />
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => handleExport('users')}
-                    disabled={exporting.users}
-                    className='flex items-center gap-3 p-4 bg-slate-900/50 border border-slate-700 rounded-xl hover:border-green-500/50 transition-colors disabled:opacity-50'
-                  >
-                    <FiUsers className='text-green-400' size={20} />
-                    <div className='text-left'>
-                      <p className='text-white font-medium'>Users</p>
-                      <p className='text-gray-500 text-xs'>Export all users</p>
-                    </div>
-                    {exporting.users ? (
-                      <div className='ml-auto w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin' />
-                    ) : (
-                      <FiDownload className='ml-auto text-gray-500' size={18} />
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => handleExport('orders')}
-                    disabled={exporting.orders}
-                    className='flex items-center gap-3 p-4 bg-slate-900/50 border border-slate-700 rounded-xl hover:border-blue-500/50 transition-colors disabled:opacity-50'
-                  >
-                    <FiShoppingBag className='text-blue-400' size={20} />
-                    <div className='text-left'>
-                      <p className='text-white font-medium'>Orders</p>
-                      <p className='text-gray-500 text-xs'>Export all orders</p>
-                    </div>
-                    {exporting.orders ? (
-                      <div className='ml-auto w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
-                    ) : (
-                      <FiDownload className='ml-auto text-gray-500' size={18} />
-                    )}
-                  </button>
-                </div>
+          {/* Expenses breakdown + activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Expenses by category</h4>
+                <Link href="/admin/expenses" className="text-[10px] text-blue-500 hover:text-blue-600 font-semibold">Manage →</Link>
               </div>
-
-              {/* User & Product Breakdown */}
-              {superAdminStats && (
-                <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6'>
-                  {/* Users by Role */}
-                  <div className='bg-slate-900 border border-slate-800 rounded-2xl p-6'>
-                    <h3 className='text-lg font-bold text-white mb-4'>Users by Role</h3>
-                    <div className='space-y-3'>
-                      {superAdminStats.usersByRole?.map((item) => (
-                        <div key={item._id} className='flex items-center justify-between'>
-                          <span className='text-gray-400 capitalize'>{item._id || 'User'}</span>
-                          <span className='text-white font-medium'>{item.count}</span>
+              {a.expByCategory.length === 0 ? (
+                <div className="text-[11px] text-slate-400 py-4 text-center">No expenses recorded in this period.</div>
+              ) : (
+                <div className="space-y-2">
+                  {a.expByCategory.map((e) => {
+                    const pct = a.opex > 0 ? (e.amount / a.opex) * 100 : 0;
+                    return (
+                      <div key={e.category} className="text-[11px]">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="capitalize text-slate-700 dark:text-slate-300">{e.category.replace(/-/g, ' ')}</span>
+                          <span className="font-semibold">{fmtMoney(e.amount)} · {pct.toFixed(0)}%</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Products by Status */}
-                  <div className='bg-slate-900 border border-slate-800 rounded-2xl p-6'>
-                    <h3 className='text-lg font-bold text-white mb-4'>Products by Status</h3>
-                    <div className='space-y-3'>
-                      {superAdminStats.productsByStatus?.map((item) => (
-                        <div key={item._id} className='flex items-center justify-between'>
-                          <span className={`capitalize ${
-                            item._id === 'active' ? 'text-green-400' :
-                            item._id === 'draft' ? 'text-yellow-400' :
-                            'text-red-400'
-                          }`}>{item._id}</span>
-                          <span className='text-white font-medium'>{item.count}</span>
+                        <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-rose-400 to-rose-500" style={{ width: `${pct}%` }} />
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Recent activity</h4>
+                <FiZap size={12} className="text-slate-400" />
+              </div>
+              {a.activity.length === 0 ? (
+                <div className="text-[11px] text-slate-400 py-4 text-center">No activity yet.</div>
+              ) : (
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {a.activity.map((ev, i) => (
+                    <li key={i} className="py-2 flex items-center justify-between gap-2 text-[11px]">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                          ev.type === 'sale' ? 'bg-purple-500/10 text-purple-600' : 'bg-emerald-500/10 text-emerald-600'
+                        }`}>
+                          {ev.type === 'sale' ? <FiShoppingBag size={10} /> : <FiShoppingCart size={10} />}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate text-slate-900 dark:text-slate-100">{ev.title}</div>
+                          <div className="text-slate-400 text-[10px]">{fmtDateTime(ev.when)}</div>
+                        </div>
+                      </div>
+                      <span className="font-semibold text-slate-900 dark:text-white shrink-0">
+                        {fmtMoney(ev.value, ev.currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* Promo summary */}
+          {promos.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Active promo codes</h4>
+                <Link href="/admin/promo-codes" className="text-[10px] text-blue-500 hover:text-blue-600 font-semibold">Manage →</Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {promos.filter((p) => p.isActive).slice(0, 6).map((p) => (
+                  <div key={p._id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-md text-[11px]">
+                    <div>
+                      <div className="font-mono font-bold">{p.code}</div>
+                      <div className="text-slate-500">
+                        {p.type === 'percent' ? `${p.value}% off` : p.type === 'fixed' ? fmtMoney(p.value) : 'Free shipping'}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 font-semibold text-slate-900 dark:text-white">
+                        <FiPercent size={10} /> {p.usedCount}/{p.usageLimit || '∞'}
+                      </div>
+                      {p.expiresAt && (
+                        <div className="text-[10px] text-slate-400">Exp {fmtDate(p.expiresAt)}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+        </>
+      )}
 
-          {/* Quick Actions */}
-          <div className='mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
-            <Link
-              href='/admin/products/new'
-              className='flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-colors group'
-            >
-              <div className='w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center group-hover:bg-blue-500/20 transition-colors'>
-                <FiPlus className='text-blue-400' size={24} />
-              </div>
-              <div>
-                <p className='text-white font-medium'>Add Product</p>
-                <p className='text-gray-500 text-sm'>Create new listing</p>
-              </div>
-            </Link>
+      {loading && <div className="text-xs text-slate-400 mt-4">Loading...</div>}
+    </AdminLayout>
+  );
+}
 
-            <Link
-              href='/admin/orders'
-              className='flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-purple-500/50 transition-colors group'
-            >
-              <div className='w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center group-hover:bg-purple-500/20 transition-colors'>
-                <FiShoppingBag className='text-purple-400' size={24} />
-              </div>
-              <div>
-                <p className='text-white font-medium'>View Orders</p>
-                <p className='text-gray-500 text-sm'>Manage all orders</p>
-              </div>
-            </Link>
+/* ---------- tiny helper components ---------- */
 
-            <Link
-              href='/admin/users'
-              className='flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-green-500/50 transition-colors group'
-            >
-              <div className='w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center group-hover:bg-green-500/20 transition-colors'>
-                <FiUsers className='text-green-400' size={24} />
-              </div>
-              <div>
-                <p className='text-white font-medium'>Manage Users</p>
-                <p className='text-gray-500 text-sm'>View all users</p>
-              </div>
-            </Link>
+function MoMTag({ value }) {
+  if (!Number.isFinite(value) || value === 0) return <span className="text-slate-500">no prior month</span>;
+  const up = value >= 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 ${up ? 'text-emerald-600' : 'text-rose-600'}`}>
+      {up ? <FiTrendingUp size={10} /> : <FiTrendingDown size={10} />}
+      {up ? '+' : ''}{value.toFixed(1)}% MoM
+    </span>
+  );
+}
 
-            <Link
-              href='/admin/products'
-              className='flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-orange-500/50 transition-colors group'
-            >
-              <div className='w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center group-hover:bg-orange-500/20 transition-colors'>
-                <FiPackage className='text-orange-400' size={24} />
-              </div>
-              <div>
-                <p className='text-white font-medium'>All Products</p>
-                <p className='text-gray-500 text-sm'>Manage inventory</p>
-              </div>
-            </Link>
-          </div>
-        </main>
+function ChannelRow({ icon: Icon, label, color, revenue, count, total }) {
+  const pct = total > 0 ? (revenue / total) * 100 : 0;
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="flex items-center gap-2 text-[11px] mb-1.5">
+        <span className={`w-6 h-6 rounded-md flex items-center justify-center ${color}`}>
+          <Icon size={11} />
+        </span>
+        <span className="flex-1 font-semibold text-slate-900 dark:text-white">{label}</span>
+        <span className="text-slate-500">{count} txn</span>
+        <span className="font-bold text-slate-900 dark:text-white">{fmtMoney(revenue)}</span>
       </div>
+      <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+        <div className={`h-full ${label === 'Online' ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-purple-400 to-purple-500'}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-[9px] text-slate-400 mt-0.5">{pct.toFixed(0)}% of revenue</div>
     </div>
+  );
+}
+
+function TopList({ items, maxValue, formatRight, formatSub }) {
+  return (
+    <ul className="space-y-2.5">
+      {items.map((it, i) => {
+        const pct = maxValue > 0 ? (it.revenue / maxValue) * 100 : 0;
+        return (
+          <li key={it.id} className="text-[11px]">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[9px] font-bold shrink-0">
+                  {i + 1}
+                </span>
+                <span className="truncate font-semibold text-slate-900 dark:text-white">{it.name}</span>
+              </div>
+              <span className="font-bold text-slate-900 dark:text-white shrink-0">{formatRight(it)}</span>
+            </div>
+            <div className="pl-7">
+              <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-400 to-blue-500" style={{ width: `${pct}%` }} />
+              </div>
+              {formatSub && <div className="text-[9px] text-slate-400 mt-0.5">{formatSub(it)}</div>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

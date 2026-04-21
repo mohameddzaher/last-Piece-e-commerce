@@ -1,14 +1,16 @@
 import Head from 'next/head';
 
 export default function SEO({
-  title = 'Last Piece - Exclusive E-Commerce for Unique Products',
-  description = 'Discover exclusive, one-of-a-kind products at Last Piece. Premium quality shoes and unique items with only one piece available. Shop now before they\'re gone!',
-  keywords = 'last piece, exclusive shoes, limited edition, unique products, premium shoes, one-of-a-kind, e-commerce',
+  title = 'Last Piece — Luxury Sneakers, Khaleeji Style',
+  description = 'Authentic, limited, one-of-a-kind sneakers from the world\'s most exclusive houses. Khaleeji luxury, now in Egypt.',
+  keywords = 'luxury sneakers, authentic sneakers, Jordan, Yeezy, Balenciaga, Nike, limited edition, Egypt, Saudi Arabia, Last Piece',
   ogImage = '/og-image.jpg',
+  image,
   ogType = 'website',
   canonical,
   noindex = false,
 }) {
+  ogImage = image || ogImage;
   const siteName = 'Last Piece';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lastpiece.com';
   const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;

@@ -1,457 +1,84 @@
+'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  FiHome,
-  FiPackage,
-  FiUsers,
-  FiShoppingBag,
-  FiMenu,
-  FiX,
-  FiLogOut,
-  FiSettings,
-  FiPlus,
-  FiEdit2,
-  FiTrash2,
-  FiGrid,
-} from 'react-icons/fi';
-import { useAuthStore } from '@/store';
-import { categoryAPI } from '@/utils/endpoints';
+import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import AdminLayout from '@/components/admin/AdminLayout';
+import DataTable from '@/components/admin/DataTable';
+import { categoryAPI } from '@/utils/endpoints';
+import { FiPlus, FiTrash2 } from 'react-icons/fi';
 
 export default function AdminCategories() {
-  const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    order: 0,
-  });
-  const [deleteModal, setDeleteModal] = useState({ open: false, category: null });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', image: '', parent: '', order: 0 });
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    if (user?.role !== 'admin' && user?.role !== 'super-admin') {
-      router.push('/dashboard');
-      toast.error('Access denied. Admin privileges required.');
-      return;
-    }
-
-    fetchCategories();
-  }, [isAuthenticated, user, router]);
-
-  const fetchCategories = async () => {
+  const load = async () => {
     try {
-      setLoading(true);
       const res = await categoryAPI.getAll();
-      if (res.data.success) {
-        setCategories(res.data.data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories');
-    } finally {
-      setLoading(false);
-    }
+      setRows(res.data.data || []);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   };
+  useEffect(() => { load(); }, []);
 
-  const handleSubmit = async (e) => {
+  const save = async (e) => {
     e.preventDefault();
-
-    if (!formData.name.trim()) {
-      toast.error('Category name is required');
-      return;
-    }
-
     try {
-      if (editingCategory) {
-        const res = await categoryAPI.update(editingCategory._id, formData);
-        if (res.data.success) {
-          toast.success('Category updated successfully');
-        }
-      } else {
-        const res = await categoryAPI.create(formData);
-        if (res.data.success) {
-          toast.success('Category created successfully');
-        }
-      }
-      setShowModal(false);
-      setEditingCategory(null);
-      setFormData({ name: '', description: '', order: 0 });
-      fetchCategories();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save category');
-    }
+      await categoryAPI.create({ ...form, slug: form.name.toLowerCase().replace(/\s+/g, '-'), parent: form.parent || undefined });
+      toast.success('Created');
+      setShowForm(false);
+      setForm({ name: '', description: '', image: '', parent: '', order: 0 });
+      load();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
   };
 
-  const handleEdit = (category) => {
-    setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      description: category.description || '',
-      order: category.order || 0,
-    });
-    setShowModal(true);
+  const del = async (id) => {
+    if (!confirm('Delete category?')) return;
+    try { await categoryAPI.delete(id); load(); } catch { toast.error('Failed'); }
   };
 
-  const handleDelete = async () => {
-    if (!deleteModal.category) return;
-
-    try {
-      const res = await categoryAPI.delete(deleteModal.category._id);
-      if (res.data.success) {
-        toast.success('Category deleted successfully');
-        fetchCategories();
-      }
-    } catch (error) {
-      toast.error('Failed to delete category');
-    } finally {
-      setDeleteModal({ open: false, category: null });
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
-
-  const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: FiHome, current: false },
-    { name: 'Products', href: '/admin/products', icon: FiPackage, current: false },
-    { name: 'Orders', href: '/admin/orders', icon: FiShoppingBag, current: false },
-    { name: 'Users', href: '/admin/users', icon: FiUsers, current: false },
-    { name: 'Settings', href: '/admin/settings', icon: FiSettings, current: false },
+  const columns = [
+    { key: 'name', label: 'Name', render: (r) => <span className="font-semibold text-xs">{r.name}</span>, exportValue: (r) => r.name },
+    { key: 'slug', label: 'Slug', render: (r) => <code className="text-[10px]">{r.slug}</code>, exportValue: (r) => r.slug },
+    { key: 'productCount', label: 'Products', accessor: (r) => r.productCount || 0 },
+    { key: 'order', label: 'Order', accessor: (r) => r.order },
+    {
+      key: 'actions', label: '',
+      render: (r) => (
+        <button onClick={(e) => { e.stopPropagation(); del(r._id); }} className="p-1.5 rounded text-rose-500 hover:bg-rose-500/10">
+          <FiTrash2 size={12} />
+        </button>
+      ),
+      exportValue: () => '',
+    },
   ];
 
   return (
-    <div className='min-h-screen bg-slate-950'>
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className='fixed inset-0 bg-black/50 z-40 lg:hidden'
-          onClick={() => setSidebarOpen(false)}
-        />
+    <AdminLayout
+      title="Categories"
+      actions={
+        <button onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded-md">
+          <FiPlus size={12} /> New
+        </button>
+      }
+    >
+      {showForm && (
+        <form onSubmit={save} className="mb-4 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-3">
+          <input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-1.5 text-xs rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+          <input placeholder="Image URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} className="px-3 py-1.5 text-xs rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+          <select value={form.parent} onChange={(e) => setForm({ ...form, parent: e.target.value })} className="px-3 py-1.5 text-xs rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <option value="">Parent (optional)</option>
+            {rows.filter((r) => !r.parent).map((r) => <option key={r._id} value={r._id}>{r.name}</option>)}
+          </select>
+          <input type="number" placeholder="Order" value={form.order} onChange={(e) => setForm({ ...form, order: Number(e.target.value) })} className="px-3 py-1.5 text-xs rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+          <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-3 py-1.5 text-xs rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 md:col-span-2" />
+          <div className="md:col-span-2 flex justify-end gap-2">
+            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs rounded-md bg-slate-200 dark:bg-slate-700">Cancel</button>
+            <button type="submit" className="px-4 py-1.5 text-xs font-semibold rounded-md bg-blue-500 text-white">Save</button>
+          </div>
+        </form>
       )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className='flex flex-col h-full'>
-          <div className='flex items-center justify-between px-6 py-5 border-b border-slate-800'>
-            <Link href='/admin' className='flex items-center gap-2'>
-              <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center'>
-                <span className='text-white font-bold text-xl'>L</span>
-              </div>
-              <span className='text-xl font-bold text-white'>Admin</span>
-            </Link>
-            <button onClick={() => setSidebarOpen(false)} className='lg:hidden text-gray-400 hover:text-white'>
-              <FiX size={24} />
-            </button>
-          </div>
-
-          <nav className='flex-1 px-4 py-6 space-y-1'>
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    item.current
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon size={20} />
-                  <span className='font-medium'>{item.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className='p-4 border-t border-slate-800'>
-            <div className='flex items-center gap-3 px-4 py-3'>
-              <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center'>
-                <span className='text-white font-bold'>
-                  {user?.firstName?.[0]}{user?.lastName?.[0]}
-                </span>
-              </div>
-              <div className='flex-1'>
-                <p className='text-white font-medium text-sm'>
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className='text-gray-500 text-xs'>{user?.role}</p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className='flex items-center gap-3 w-full px-4 py-3 text-gray-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-all mt-2'
-            >
-              <FiLogOut size={20} />
-              <span className='font-medium'>Logout</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className='lg:pl-64'>
-        {/* Top Bar */}
-        <header className='sticky top-0 z-30 bg-slate-950/80 backdrop-blur-sm border-b border-slate-800'>
-          <div className='flex items-center justify-between px-4 lg:px-8 py-4'>
-            <div className='flex items-center gap-4'>
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className='lg:hidden text-gray-400 hover:text-white'
-              >
-                <FiMenu size={24} />
-              </button>
-              <div>
-                <h1 className='text-xl font-bold text-white'>Categories</h1>
-                <p className='text-sm text-gray-400'>Manage product categories</p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setEditingCategory(null);
-                setFormData({ name: '', description: '', order: 0 });
-                setShowModal(true);
-              }}
-              className='flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors'
-            >
-              <FiPlus size={18} />
-              Add Category
-            </button>
-          </div>
-        </header>
-
-        {/* Categories Content */}
-        <main className='p-4 lg:p-8'>
-          <div className='bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden'>
-            {loading ? (
-              <div className='flex items-center justify-center py-20'>
-                <div className='w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
-              </div>
-            ) : categories.length > 0 ? (
-              <div className='overflow-x-auto'>
-                <table className='w-full'>
-                  <thead>
-                    <tr className='border-b border-slate-800'>
-                      <th className='text-left px-6 py-4 text-gray-400 font-medium'>Category</th>
-                      <th className='text-left px-6 py-4 text-gray-400 font-medium'>Description</th>
-                      <th className='text-left px-6 py-4 text-gray-400 font-medium'>Products</th>
-                      <th className='text-left px-6 py-4 text-gray-400 font-medium'>Order</th>
-                      <th className='text-right px-6 py-4 text-gray-400 font-medium'>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.map((category) => (
-                      <tr key={category._id} className='border-b border-slate-800/50 hover:bg-slate-800/30'>
-                        <td className='px-6 py-4'>
-                          <div className='flex items-center gap-3'>
-                            <div className='w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center'>
-                              <FiGrid className='text-blue-400' size={20} />
-                            </div>
-                            <div>
-                              <p className='text-white font-medium'>{category.name}</p>
-                              <p className='text-gray-500 text-sm'>{category.slug}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className='px-6 py-4'>
-                          <p className='text-gray-400 text-sm truncate max-w-xs'>
-                            {category.description || '-'}
-                          </p>
-                        </td>
-                        <td className='px-6 py-4'>
-                          <span className='px-3 py-1 bg-slate-800 text-gray-300 rounded-lg text-sm'>
-                            {category.productCount || 0} products
-                          </span>
-                        </td>
-                        <td className='px-6 py-4'>
-                          <span className='text-gray-400'>{category.order || 0}</span>
-                        </td>
-                        <td className='px-6 py-4'>
-                          <div className='flex items-center justify-end gap-2'>
-                            <button
-                              onClick={() => handleEdit(category)}
-                              className='p-2 text-gray-400 hover:text-blue-400 hover:bg-slate-800 rounded-lg transition-colors'
-                              title='Edit'
-                            >
-                              <FiEdit2 size={18} />
-                            </button>
-                            <button
-                              onClick={() => setDeleteModal({ open: true, category })}
-                              className='p-2 text-gray-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors'
-                              title='Delete'
-                            >
-                              <FiTrash2 size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className='text-center py-20'>
-                <FiGrid className='mx-auto text-gray-600 mb-4' size={48} />
-                <h3 className='text-xl font-bold text-white mb-2'>No categories found</h3>
-                <p className='text-gray-400 mb-4'>Create your first category to get started</p>
-                <button
-                  onClick={() => setShowModal(true)}
-                  className='px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors'
-                >
-                  Add Category
-                </button>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-
-      {/* Add/Edit Modal */}
-      <AnimatePresence>
-        {showModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'
-            onClick={() => setShowModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className='bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full'
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className='text-xl font-bold text-white mb-6'>
-                {editingCategory ? 'Edit Category' : 'Add Category'}
-              </h3>
-
-              <form onSubmit={handleSubmit} className='space-y-4'>
-                <div>
-                  <label className='block text-sm font-medium text-gray-300 mb-2'>
-                    Category Name *
-                  </label>
-                  <input
-                    type='text'
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className='w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
-                    placeholder='Enter category name'
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className='block text-sm font-medium text-gray-300 mb-2'>
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className='w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none'
-                    placeholder='Enter category description'
-                  />
-                </div>
-
-                <div>
-                  <label className='block text-sm font-medium text-gray-300 mb-2'>
-                    Display Order
-                  </label>
-                  <input
-                    type='number'
-                    value={formData.order}
-                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
-                    className='w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
-                    placeholder='0'
-                  />
-                </div>
-
-                <div className='flex gap-4 pt-4'>
-                  <button
-                    type='button'
-                    onClick={() => setShowModal(false)}
-                    className='flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors'
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type='submit'
-                    className='flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors'
-                  >
-                    {editingCategory ? 'Update' : 'Create'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Delete Modal */}
-      <AnimatePresence>
-        {deleteModal.open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'
-            onClick={() => setDeleteModal({ open: false, category: null })}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className='bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full'
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className='text-center'>
-                <div className='w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4'>
-                  <FiTrash2 className='text-red-400' size={32} />
-                </div>
-                <h3 className='text-xl font-bold text-white mb-2'>Delete Category</h3>
-                <p className='text-gray-400 mb-6'>
-                  Are you sure you want to delete "{deleteModal.category?.name}"? This action cannot be undone.
-                </p>
-                <div className='flex gap-4'>
-                  <button
-                    onClick={() => setDeleteModal({ open: false, category: null })}
-                    className='flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors'
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className='flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors'
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      <DataTable columns={columns} rows={rows} searchKeys={['name', 'slug']} exportFilename="categories" emptyMessage={loading ? 'Loading...' : 'No categories.'} />
+    </AdminLayout>
   );
 }

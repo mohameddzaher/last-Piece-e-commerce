@@ -19,16 +19,69 @@ body {
   line-height: 1.6;
 }
 
+/* RTL / Arabic font stack */
+html[dir='rtl'],
+body.font-arabic {
+  font-family: 'Tajawal', 'Cairo', 'Segoe UI', 'Inter', system-ui, sans-serif;
+}
+
+html[dir='rtl'] .ltr-only {
+  display: none;
+}
+html[dir='ltr'] .rtl-only {
+  display: none;
+}
+
+/* Flip directional icons in RTL where they should mirror */
+html[dir='rtl'] .flip-rtl {
+  transform: scaleX(-1);
+}
+
 body.dark {
   background-color: #0f172a;
   color: #f1f5f9;
 }
 
-/* Typography */
+/* Typography — use the same sans stack everywhere for readability.
+   Headings just get weight+size, not a different font. */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Playfair Display', serif;
   font-weight: 700;
   line-height: 1.2;
+}
+
+html[dir='rtl'] h1,
+html[dir='rtl'] h2,
+html[dir='rtl'] h3,
+html[dir='rtl'] h4,
+html[dir='rtl'] h5,
+html[dir='rtl'] h6,
+body.font-arabic h1,
+body.font-arabic h2,
+body.font-arabic h3,
+body.font-arabic h4,
+body.font-arabic h5,
+body.font-arabic h6 {
+  font-family: 'Cairo', 'Tajawal', 'Inter', system-ui, sans-serif;
+}
+
+/* Hide scrollbar on horizontal scroll tabs */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Brand ticker — continuous horizontal scroll. Shifts by one "set" width
+   (we render the same list three times; shifting a third of the whole line
+   lands on an identical frame, so the loop reads as seamless). */
+@keyframes brand-scroll {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-33.3333%, 0, 0); }
+}
+.animate-brand-scroll {
+  animation: brand-scroll 40s linear infinite;
+  will-change: transform;
+}
+.animate-brand-scroll:hover { animation-play-state: paused; }
+html[dir='rtl'] .animate-brand-scroll {
+  animation-direction: reverse;
 }
 
 h1 {

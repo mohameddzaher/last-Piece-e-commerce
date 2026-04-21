@@ -1,101 +1,112 @@
 'use client';
 
 import Link from 'next/link';
-import { FiFacebook, FiTwitter, FiInstagram, FiMail, FiMapPin, FiPhone, FiTruck, FiShield, FiRefreshCw, FiCreditCard } from 'react-icons/fi';
+import Image from 'next/image';
+import {
+  FiInstagram, FiMail, FiMapPin, FiTruck, FiShield,
+  FiRefreshCw, FiCreditCard, FiClock, FiMessageCircle,
+} from 'react-icons/fi';
+import { useSiteContent, pick } from '@/utils/useSiteContent';
+import { useI18n } from '@/utils/i18n';
 
 export default function Footer() {
+  const cms = useSiteContent();
+  const config = cms['contact.config'] || {};
+  const footerAbout = cms['footer.about'] || {};
+  const t = useI18n((s) => s.t);
+
   const currentYear = new Date().getFullYear();
+  const supportEmail = pick(config, 'email', 'support@lastpiece.com');
+  const whatsapp = pick(config, 'whatsapp', '+20 100 000 0001');
+  const instagram = pick(config, 'instagram', '@lastpiece');
+  const hours = pick(config, 'hours', '24/7 · Online support every day');
 
   return (
-    <footer className='bg-slate-900 border-t border-slate-800'>
+    <footer className="bg-slate-900 border-t border-slate-800">
       {/* Trust Badges */}
-      <div className='border-b border-slate-800'>
-        <div className='max-w-7xl mx-auto px-4 py-4'>
-          <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-            <div className='flex items-center gap-2'>
-              <div className='p-1.5 bg-blue-500/10 rounded-lg'>
-                <FiTruck className='text-blue-400' size={16} />
+      <div className="border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 py-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { Icon: FiTruck, color: 'text-blue-400 bg-blue-500/10', title: t('footer.trust.shipping.title', 'Egypt-wide shipping'), sub: t('footer.trust.shipping.sub', 'Fast & insured') },
+              { Icon: FiShield, color: 'text-emerald-400 bg-emerald-500/10', title: t('footer.trust.authentic.title', '100% Authentic'), sub: t('footer.trust.authentic.sub', 'Verified by hand') },
+              { Icon: FiRefreshCw, color: 'text-purple-400 bg-purple-500/10', title: t('footer.trust.returns.title', '7-day Returns'), sub: t('footer.trust.returns.sub', 'Boutique exchanges') },
+              { Icon: FiCreditCard, color: 'text-amber-400 bg-amber-500/10', title: t('footer.trust.secure.title', 'Secure Checkout'), sub: t('footer.trust.secure.sub', 'SSL encrypted') },
+            ].map(({ Icon, color, title, sub }, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-lg ${color}`}><Icon size={14} /></div>
+                <div>
+                  <p className="text-white text-xs font-semibold">{title}</p>
+                  <p className="text-gray-500 text-[10px]">{sub}</p>
+                </div>
               </div>
-              <div>
-                <p className='text-white text-xs font-medium'>Free Shipping</p>
-                <p className='text-gray-500 text-[10px]'>On orders over $150</p>
-              </div>
-            </div>
-            <div className='flex items-center gap-2'>
-              <div className='p-1.5 bg-green-500/10 rounded-lg'>
-                <FiShield className='text-green-400' size={16} />
-              </div>
-              <div>
-                <p className='text-white text-xs font-medium'>Authenticity</p>
-                <p className='text-gray-500 text-[10px]'>100% genuine products</p>
-              </div>
-            </div>
-            <div className='flex items-center gap-2'>
-              <div className='p-1.5 bg-purple-500/10 rounded-lg'>
-                <FiRefreshCw className='text-purple-400' size={16} />
-              </div>
-              <div>
-                <p className='text-white text-xs font-medium'>Easy Returns</p>
-                <p className='text-gray-500 text-[10px]'>14-day return policy</p>
-              </div>
-            </div>
-            <div className='flex items-center gap-2'>
-              <div className='p-1.5 bg-amber-500/10 rounded-lg'>
-                <FiCreditCard className='text-amber-400' size={16} />
-              </div>
-              <div>
-                <p className='text-white text-xs font-medium'>Secure Payment</p>
-                <p className='text-gray-500 text-[10px]'>SSL encrypted checkout</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Main Footer */}
-      <div className='max-w-7xl mx-auto px-4 py-8'>
-        <div className='grid grid-cols-2 md:grid-cols-4 gap-6'>
-          {/* Brand Section */}
-          <div className='col-span-2 md:col-span-1'>
-            <Link href='/' className='flex items-center gap-2 mb-3'>
-              <div className='w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center'>
-                <span className='text-white font-bold text-sm'>L</span>
-              </div>
-              <span className='text-sm font-bold text-white'>LAST PIECE</span>
+      <div className="max-w-7xl mx-auto px-4 py-10">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+          {/* Brand */}
+          <div className="col-span-2">
+            <Link href="/" className="inline-block mb-3" aria-label="Last Piece home">
+              <Image
+                src="/images/logo.png"
+                alt="Last Piece"
+                width={160}
+                height={80}
+                className="h-14 w-auto object-contain"
+              />
             </Link>
-            <p className='text-gray-400 text-xs leading-relaxed mb-3'>
-              Exclusive sneakers where every pair is one-of-a-kind. When it's gone, it's gone forever.
+            <p className="text-gray-400 text-xs leading-relaxed mb-4 max-w-sm">
+              {pick(footerAbout, 'body', t('footer.aboutBody', 'A Khaleeji luxury sneaker boutique. Born in Riyadh, now serving Egypt.'))}
             </p>
-            <div className='flex gap-2'>
-              {[
-                { Icon: FiFacebook, href: '#' },
-                { Icon: FiTwitter, href: '#' },
-                { Icon: FiInstagram, href: '#' },
-              ].map(({ Icon, href }, idx) => (
-                <a
-                  key={idx}
-                  href={href}
-                  className='p-2 bg-slate-800 rounded-lg text-gray-400 hover:text-white hover:bg-slate-700 transition-colors'
-                >
-                  <Icon size={14} />
-                </a>
-              ))}
+            <div className="flex items-center gap-2 mb-3">
+              <a
+                href={`https://instagram.com/${instagram.replace('@', '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-slate-800 rounded-lg text-gray-400 hover:text-white hover:bg-slate-700 transition-colors"
+                aria-label="Instagram"
+              >
+                <FiInstagram size={14} />
+              </a>
+              <a
+                href={`https://wa.me/${whatsapp.replace(/[^\d+]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-slate-800 rounded-lg text-gray-400 hover:text-white hover:bg-slate-700 transition-colors"
+                aria-label="WhatsApp"
+              >
+                <FiMessageCircle size={14} />
+              </a>
+              <a
+                href={`mailto:${supportEmail}`}
+                className="p-2 bg-slate-800 rounded-lg text-gray-400 hover:text-white hover:bg-slate-700 transition-colors"
+                aria-label="Email"
+              >
+                <FiMail size={14} />
+              </a>
+            </div>
+            <div className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
+              <FiClock size={10} /> {hours}
             </div>
           </div>
 
-          {/* Shop Categories */}
+          {/* Shop */}
           <div>
-            <h4 className='font-semibold text-sm text-white mb-3'>Shop</h4>
-            <ul className='space-y-2'>
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-white mb-3">{t('footer.shop', 'Shop')}</h4>
+            <ul className="space-y-2">
               {[
-                { href: '/products', label: 'All Sneakers' },
-                { href: '/products?category=sneakers', label: 'Sneakers' },
-                { href: '/products?category=running', label: 'Running' },
-                { href: '/products?category=casual', label: 'Casual' },
-                { href: '/products?category=limited-edition', label: 'Limited Edition' },
+                { href: '/products', label: t('footer.links.allProducts', 'All Products') },
+                { href: '/products?gender=men', label: t('footer.links.men', 'Men') },
+                { href: '/products?gender=women', label: t('footer.links.women', 'Women') },
+                { href: '/products?gender=kids', label: t('footer.links.kids', 'Kids') },
+                { href: '/products?sort=-createdAt', label: t('footer.links.newArrivals', 'New Arrivals') },
               ].map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className='text-gray-400 hover:text-white text-xs transition-colors'>
+                  <Link href={link.href} className="text-gray-400 hover:text-white text-xs">
                     {link.label}
                   </Link>
                 </li>
@@ -103,19 +114,19 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Help */}
           <div>
-            <h4 className='font-semibold text-sm text-white mb-3'>Help</h4>
-            <ul className='space-y-2'>
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-white mb-3">{t('footer.help', 'Help')}</h4>
+            <ul className="space-y-2">
               {[
-                { href: '/contact', label: 'Contact Us' },
-                { href: '/faq', label: 'FAQ' },
-                { href: '/shipping', label: 'Shipping Info' },
-                { href: '/returns', label: 'Returns & Exchanges' },
-                { href: '/size-guide', label: 'Size Guide' },
+                { href: '/contact', label: t('footer.links.contact', 'Contact Us') },
+                { href: '/faq', label: t('footer.links.faq', 'FAQ') },
+                { href: '/shipping', label: t('footer.links.shipping', 'Shipping & Delivery') },
+                { href: '/returns', label: t('footer.links.returns', 'Returns & Exchanges') },
+                { href: '/size-guide', label: t('footer.links.sizeGuide', 'Size Guide') },
               ].map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className='text-gray-400 hover:text-white text-xs transition-colors'>
+                  <Link href={link.href} className="text-gray-400 hover:text-white text-xs">
                     {link.label}
                   </Link>
                 </li>
@@ -123,61 +134,52 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Company */}
           <div>
-            <h4 className='font-semibold text-sm text-white mb-3'>Contact</h4>
-            <ul className='space-y-2'>
-              <li className='flex items-center gap-2 text-gray-400 text-xs'>
-                <FiMail size={12} />
-                <span>Info@lastpiece.com</span>
-              </li>
-              <li className='flex items-center gap-2 text-gray-400 text-xs'>
-                <FiPhone size={12} />
-                <span>+966 53 848 6109</span>
-              </li>
-              <li className='flex items-start gap-2 text-gray-400 text-xs'>
-                <FiMapPin size={12} className='mt-0.5' />
-                <span>Jeddah, Saudi Arabia</span>
-              </li>
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-white mb-3">{t('footer.company', 'Company')}</h4>
+            <ul className="space-y-2">
+              {[
+                { href: '/about', label: t('footer.links.ourStory', 'Our Story') },
+                { href: '/contact', label: t('footer.links.locations', 'Locations') },
+                { href: '/privacy', label: t('footer.links.privacy', 'Privacy Policy') },
+                { href: '/terms', label: t('footer.links.terms', 'Terms of Service') },
+                { href: '/cookies', label: t('footer.links.cookies', 'Cookies') },
+              ].map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-gray-400 hover:text-white text-xs">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
-
-            {/* Newsletter */}
-            <div className='mt-4'>
-              <p className='text-xs text-gray-400 mb-2'>Get notified about new drops</p>
-              <div className='flex gap-1'>
-                <input
-                  type='email'
-                  placeholder='Email'
-                  className='flex-1 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                />
-                <button className='px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors'>
-                  Join
-                </button>
-              </div>
-            </div>
           </div>
+        </div>
+
+        {/* Locations strip */}
+        <div className="mt-10 pt-6 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          {[
+            { city: `${t('nav.riyadh', 'Riyadh')} 🇸🇦`, detail: t('footer.branch', 'Branch') },
+            { city: `${t('nav.jeddah', 'Jeddah')} 🇸🇦`, detail: t('footer.branch', 'Branch') },
+            { city: `${t('nav.cairo', 'Cairo')} 🇪🇬`, detail: t('footer.branchCairo', 'Branch · Delivery everywhere in Cairo') },
+          ].map((l) => (
+            <div key={l.city} className="flex items-center gap-2 text-gray-400">
+              <FiMapPin size={11} className="text-amber-400" />
+              <span className="text-white font-semibold">{l.city}</span>
+              <span className="text-gray-500">· {l.detail}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Bottom Footer */}
-      <div className='border-t border-slate-800'>
-        <div className='max-w-7xl mx-auto px-4 py-4'>
-          <div className='flex flex-col md:flex-row justify-between items-center gap-2'>
-            <p className='text-gray-500 text-xs'>
-              &copy; {currentYear} Last Piece. All rights reserved.
-            </p>
-            <div className='flex gap-4'>
-              <Link href='/privacy' className='text-gray-500 hover:text-gray-300 text-xs transition-colors'>
-                Privacy
-              </Link>
-              <Link href='/terms' className='text-gray-500 hover:text-gray-300 text-xs transition-colors'>
-                Terms
-              </Link>
-              <Link href='/cookies' className='text-gray-500 hover:text-gray-300 text-xs transition-colors'>
-                Cookies
-              </Link>
-            </div>
-          </div>
+      {/* Bottom */}
+      <div className="border-t border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-2">
+          <p className="text-gray-500 text-xs">
+            &copy; {currentYear} Last Piece. {t('footer.rights', 'All rights reserved.')}
+          </p>
+          <p className="text-gray-500 text-[10px]">
+            {t('footer.madeWith', 'Made with care between the Khaleej and Cairo.')}
+          </p>
         </div>
       </div>
     </footer>

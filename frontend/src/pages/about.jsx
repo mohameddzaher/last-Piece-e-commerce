@@ -1,141 +1,161 @@
+'use client';
 
-import { FiCheckCircle, FiAward, FiUsers, FiShield } from 'react-icons/fi';
-import { motion } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { FiAward, FiUsers, FiShield, FiArrowRight } from 'react-icons/fi';
+import SEO from '@/components/SEO';
+import { useSiteContent, pick } from '@/utils/useSiteContent';
+import { useI18n } from '@/utils/i18n';
 
 export default function About() {
+  const cms = useSiteContent();
+  const story = cms['about.story'] || {};
+  const t = useI18n((s) => s.t);
+
+  const locations = [
+    { city: t('contact.locations.riyadh', 'Riyadh'), country: t('contact.saudi', 'Saudi Arabia'), role: t('about.branchRole', 'Branch'), flag: '🇸🇦' },
+    { city: t('contact.locations.jeddah', 'Jeddah'), country: t('contact.saudi', 'Saudi Arabia'), role: t('about.branchRole', 'Branch'), flag: '🇸🇦' },
+    { city: t('contact.locations.cairo', 'Cairo'), country: t('contact.egypt', 'Egypt'), role: t('about.branchRoleCairo', 'Branch · Delivery across Cairo'), flag: '🇪🇬' },
+  ];
+
   return (
-    <div className='min-h-screen bg-slate-950'>
-      {/* Header */}
-      <div className='bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-800'>
-        <div className='max-w-7xl mx-auto px-4 py-8'>
-          <h1 className='text-2xl font-bold text-white mb-2'>About Us</h1>
-          <p className='text-gray-400 text-xs'>The story behind Last Piece</p>
+    <>
+      <SEO title={`${t('about.seoTitle', 'About Us')} · Last Piece`} description={t('about.seoDesc', 'A Khaleeji luxury sneaker boutique.')} />
+
+      {/* HERO */}
+      <section className="relative bg-slate-950 border-b border-slate-800 overflow-hidden">
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/30 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-purple-500/30 rounded-full blur-3xl" />
         </div>
-      </div>
-
-      <div className='max-w-5xl mx-auto px-4 py-10'>
-        {/* Hero Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className='text-center mb-12'
-        >
-          <h2 className='text-3xl font-bold text-white mb-4'>One Pair. One Owner.</h2>
-          <p className='text-gray-400 text-sm max-w-2xl mx-auto leading-relaxed'>
-            At Last Piece, we believe every sneaker tells a story. We curate exclusive, one-of-a-kind pairs
-            for collectors who appreciate authenticity and uniqueness. When you buy from us, you're getting
-            the only pair in existence.
+        <div className="relative max-w-5xl mx-auto px-4 py-10 md:py-14 text-center">
+          <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-blue-400 mb-2">{t('about.eyebrow', 'OUR STORY')}</div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
+            {t('about.heroTitle', 'One Pair. One Owner.')}
+          </h1>
+          <p className="text-xs md:text-sm text-gray-300 max-w-xl mx-auto mt-2 leading-relaxed">
+            {t('about.heroSubtitle', 'A Khaleeji luxury sneaker boutique.')}
           </p>
-        </motion.section>
+        </div>
+      </section>
 
-        {/* Stats */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className='grid grid-cols-2 md:grid-cols-4 gap-4 mb-12'
-        >
+      {/* STATS */}
+      <section className="bg-white border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
-            { value: '500+', label: 'Unique Pairs Sold' },
-            { value: '100%', label: 'Authentic Products' },
-            { value: '24/7', label: 'Customer Support' },
-            { value: '5K+', label: 'Happy Collectors' },
-          ].map((stat, idx) => (
-            <div key={idx} className='text-center p-4 bg-slate-900 border border-slate-800 rounded-lg'>
-              <p className='text-2xl font-bold text-blue-400'>{stat.value}</p>
-              <p className='text-gray-500 text-xs'>{stat.label}</p>
-            </div>
+            { value: '500+', label: t('about.stats.pairs', 'Pairs Curated') },
+            { value: '100%', label: t('about.stats.authentic', 'Authentic') },
+            { value: '3', label: t('about.stats.branches', 'Branches') },
+            { value: '24/7', label: t('about.stats.support', 'Customer Care') },
+          ].map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.05 }}
+              className="text-center p-3 bg-slate-50 border border-slate-200 rounded-lg"
+            >
+              <p className="text-lg md:text-xl font-bold text-slate-900">{s.value}</p>
+              <p className="text-slate-500 text-[10px] mt-0.5 uppercase tracking-wider">{s.label}</p>
+            </motion.div>
           ))}
-        </motion.section>
+        </div>
+      </section>
 
-        {/* Story */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className='grid grid-cols-1 md:grid-cols-2 gap-8 items-center mb-12'
-        >
-          <div>
-            <h3 className='text-xl font-bold text-white mb-4'>Our Story</h3>
-            <p className='text-gray-400 text-sm mb-4 leading-relaxed'>
-              Last Piece was born from a passion for sneaker culture and the frustration of seeing
-              mass-produced shoes everywhere. We wanted to create something different - a place where
-              each pair is truly special.
+      {/* STORY */}
+      <section className="bg-white">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch">
+          <div className="relative aspect-[4/3] md:aspect-auto md:min-h-[280px]">
+            <Image
+              src={pick(story, 'image', 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1400&q=85')}
+              alt="Our story"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
+          </div>
+          <div className="p-5 md:p-8 flex flex-col justify-center text-slate-900">
+            <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-600 mb-2">
+              {pick(story, 'eyebrow', t('about.storyEyebrow', 'OUR STORY'))}
+            </div>
+            <h2 className="text-lg md:text-xl font-bold mb-2 leading-tight">
+              {pick(story, 'title', t('about.storyTitle', 'Born in the Khaleej. Curated for Cairo.'))}
+            </h2>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+              {pick(story, 'p1', t('about.storyP1', 'Last Piece started as a private collection in Riyadh.'))}
             </p>
-            <p className='text-gray-400 text-sm leading-relaxed'>
-              Every sneaker in our collection is carefully sourced, verified for authenticity, and
-              available in limited quantities. Most items are literally the last piece in existence.
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {pick(story, 'p2', t('about.storyP2', 'Today, we bring the same standards to Egypt.'))}
             </p>
           </div>
-          <div className='bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-slate-800 rounded-xl h-48 flex items-center justify-center'>
-            <span className='text-4xl'>👟</span>
-          </div>
-        </motion.section>
+        </div>
+      </section>
 
-        {/* Values */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className='mb-12'
-        >
-          <h3 className='text-xl font-bold text-white text-center mb-6'>Our Values</h3>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+      {/* LOCATIONS */}
+      <section className="bg-slate-50 border-y border-slate-200">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <div className="text-center mb-5">
+            <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-600 mb-1">{t('about.branchesEyebrow', 'OUR BRANCHES')}</div>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-900">{t('about.branchesTitle', 'In the Khaleej & in Cairo')}</h2>
+            <p className="text-[11px] text-slate-500 mt-1">{t('about.branchesSubtitle', 'Three branches. Delivery anywhere in Cairo.')}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {locations.map((l) => (
+              <div key={l.city} className="p-4 bg-white border border-slate-200 rounded-lg text-center">
+                <div className="text-xl mb-1">{l.flag}</div>
+                <h3 className="text-sm font-bold text-slate-900">{l.city}</h3>
+                <p className="text-[10px] text-slate-500">{l.country}</p>
+                <p className="mt-1 text-[9px] uppercase tracking-wider font-semibold text-blue-600">{l.role}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* VALUES */}
+      <section className="bg-slate-950 text-white">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <h2 className="text-xl md:text-2xl font-bold text-center mb-5">{t('about.valuesTitle', 'Our Values')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {[
-              {
-                icon: FiShield,
-                title: 'Authenticity',
-                desc: 'Every item is verified and guaranteed 100% authentic',
-                color: 'blue'
-              },
-              {
-                icon: FiAward,
-                title: 'Quality',
-                desc: 'Premium sneakers from trusted sources worldwide',
-                color: 'green'
-              },
-              {
-                icon: FiUsers,
-                title: 'Community',
-                desc: 'Building a community of passionate collectors',
-                color: 'purple'
-              },
-            ].map((value, idx) => (
+              { icon: FiShield, title: t('about.values.authenticity.title', 'Authenticity'), desc: t('about.values.authenticity.desc', 'Every pair verified by hand.'), color: 'text-blue-400 bg-blue-500/10' },
+              { icon: FiAward, title: t('about.values.unique.title', 'Unique pieces'), desc: t('about.values.unique.desc', "Pieces you won't find anywhere else."), color: 'text-amber-400 bg-amber-500/10' },
+              { icon: FiUsers, title: t('about.values.trust.title', 'Trust'), desc: t('about.values.trust.desc', 'Relationships first.'), color: 'text-emerald-400 bg-emerald-500/10' },
+            ].map((v, i) => (
               <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + idx * 0.1 }}
-                className='bg-slate-900 border border-slate-800 p-5 rounded-xl'
+                key={i}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.06 }}
+                className="p-4 bg-slate-900 border border-slate-800 rounded-lg"
               >
-                <div className={`p-2 bg-${value.color}-500/10 rounded-lg w-fit mb-3`}>
-                  <value.icon className={`text-${value.color}-400`} size={20} />
+                <div className={`w-8 h-8 rounded-md flex items-center justify-center mb-2 ${v.color}`}>
+                  <v.icon size={14} />
                 </div>
-                <h4 className='text-base font-semibold text-white mb-2'>{value.title}</h4>
-                <p className='text-gray-500 text-xs'>{value.desc}</p>
+                <h3 className="text-sm font-bold mb-0.5">{v.title}</h3>
+                <p className="text-[11px] text-gray-400">{v.desc}</p>
               </motion.div>
             ))}
           </div>
-        </motion.section>
+        </div>
+      </section>
 
-        {/* CTA */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className='text-center bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-slate-800 rounded-xl p-8'
-        >
-          <h3 className='text-xl font-bold text-white mb-2'>Ready to Find Your Last Piece?</h3>
-          <p className='text-gray-400 text-sm mb-4'>Browse our exclusive collection of one-of-a-kind sneakers</p>
-          <a
-            href='/products'
-            className='inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors'
+      {/* CTA */}
+      <section className="bg-white">
+        <div className="max-w-3xl mx-auto px-4 py-8 text-center">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-2">{t('about.ctaTitle', 'Ready to find your Last Piece?')}</h2>
+          <p className="text-xs text-slate-500 mb-4">{t('about.ctaSubtitle', 'Browse our curated, one-of-a-kind collection.')}</p>
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-1.5 h-9 px-5 bg-slate-900 text-white rounded-full text-xs font-semibold hover:bg-slate-800"
           >
-            Shop Now
-          </a>
-        </motion.section>
-      </div>
-    </div>
+            {t('about.ctaButton', 'Shop the Collection')} <FiArrowRight size={12} className='rtl:rotate-180' />
+          </Link>
+        </div>
+      </section>
+    </>
   );
 }

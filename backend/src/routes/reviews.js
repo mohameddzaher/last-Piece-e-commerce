@@ -5,6 +5,7 @@ import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { calculatePagination } from '../utils/helpers.js';
+import { emitReviewChange } from '../realtime/io.js';
 
 const router = express.Router();
 
@@ -142,15 +143,22 @@ router.post('/', protect, async (req, res, next) => {
       }
     }
 
-    // Check if user purchased the product
+    // Verify the user actually purchased the product before letting them review it.
+    // Store reviews (homepage testimonials) are exempt — anyone can leave one.
     let verified = false;
-    if (productId) {
+    if (productId && !isStoreReview) {
       const order = await Order.findOne({
         userId: req.user.id,
         'items.productId': productId,
         status: { $in: ['delivered', 'completed'] },
       });
       verified = !!order;
+      if (!verified) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only customers who purchased and received this product can review it',
+        });
+      }
     }
 
     const review = await Review.create({
@@ -182,6 +190,8 @@ router.post('/', protect, async (req, res, next) => {
 
     await review.populate('userId', 'firstName lastName');
 
+    emitReviewChange('review:created', review);
+
     res.status(201).json({
       success: true,
       message: 'Review submitted successfully',
@@ -211,6 +221,8 @@ router.put('/:id/status', protect, authorize('admin', 'super-admin'), async (req
       });
     }
 
+    emitReviewChange('review:updated', review);
+
     res.status(200).json({
       success: true,
       message: 'Review status updated',
@@ -236,6 +248,8 @@ router.put('/:id/featured', protect, authorize('admin', 'super-admin'), async (r
 
     review.isFeatured = !review.isFeatured;
     await review.save();
+
+    emitReviewChange('review:updated', review);
 
     res.status(200).json({
       success: true,
@@ -281,6 +295,8 @@ router.delete('/:id', protect, authorize('admin', 'super-admin'), async (req, re
         });
       }
     }
+
+    emitReviewChange('review:deleted', review);
 
     res.status(200).json({
       success: true,

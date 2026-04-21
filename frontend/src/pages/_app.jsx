@@ -5,9 +5,12 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import RouteProgress from "@/components/RouteProgress";
 import { ToastContainer } from "react-toastify";
 import { useAuthStore, useCartStore, useWishlistStore } from "@/store";
 import { cartAPI, wishlistAPI, authAPI } from "@/utils/endpoints";
+import { useI18n } from "@/utils/i18n";
+import { getSocket, reconnectSocket } from "@/utils/socket";
 
 // Client-only wrapper: useRouter must not run during SSG/prerender.
 // This component is only rendered after mount, so router is available.
@@ -16,6 +19,27 @@ function AppContent({ Component, pageProps }) {
   const { isAuthenticated, setUser, setTokens } = useAuthStore();
   const setCart = useCartStore((state) => state.setCart);
   const setWishlist = useWishlistStore((state) => state.setWishlist);
+  const initI18n = useI18n((s) => s.init);
+
+  // i18n is already initialized synchronously at module load (translations
+  // are bundled). This effect just syncs `lang`/`dir` onto <html> after mount
+  // and schedules the socket connection off the critical boot path so the
+  // first paint isn't competing with the WebSocket handshake.
+  useEffect(() => {
+    initI18n();
+    const idle = (cb) =>
+      (typeof window !== 'undefined' && window.requestIdleCallback
+        ? window.requestIdleCallback(cb, { timeout: 600 })
+        : setTimeout(cb, 400));
+    const handle = idle(() => { getSocket(); });
+    return () => {
+      if (typeof window !== 'undefined' && window.cancelIdleCallback && typeof handle === 'number') {
+        try { window.cancelIdleCallback(handle); } catch {}
+      } else {
+        clearTimeout(handle);
+      }
+    };
+  }, [initI18n]);
 
   useEffect(() => {
     // Check for saved tokens and restore session
@@ -29,6 +53,8 @@ function AppContent({ Component, pageProps }) {
         .then((res) => {
           if (res.data.success) {
             setUser(res.data.data);
+            // Reconnect socket so the handshake includes the auth token
+            reconnectSocket();
           }
         })
         .catch((err) => {
@@ -65,15 +91,7 @@ function AppContent({ Component, pageProps }) {
     }
   }, [isAuthenticated, setCart, setWishlist]);
 
-  const noLayoutPages = [
-    "/admin",
-    "/admin/products",
-    "/admin/orders",
-    "/admin/users",
-  ];
-  const isNoLayoutPage = noLayoutPages.some((page) =>
-    router.pathname.startsWith(page),
-  );
+  const isNoLayoutPage = router.pathname.startsWith("/admin");
 
   if (isNoLayoutPage) {
     return (
@@ -97,8 +115,9 @@ function AppContent({ Component, pageProps }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
+      <RouteProgress />
       <Header />
-      <main className="pt-20">
+      <main className="pt-16">
         <Component {...pageProps} />
       </main>
       <Footer />
@@ -119,13 +138,10 @@ function AppContent({ Component, pageProps }) {
 }
 
 function MyApp({ Component, pageProps }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Default document meta (no custom _document to avoid Netlify "Html outside _document" error)
+  // NOTE: we used to gate AppContent behind a "mounted" flag to avoid SSR
+  // issues. That caused a visible flash on page refresh — a new, valid frame
+  // appears, then the client takes over and re-renders. Removed: useRouter
+  // and our zustand stores are safe during SSR, so render immediately.
   return (
     <>
       <Head>
@@ -134,12 +150,16 @@ function MyApp({ Component, pageProps }) {
         <meta name="theme-color" content="#0F172A" />
         <meta
           name="description"
-          content="Last Piece - Discover unique, one-of-a-kind products"
+          content="Last Piece — Khaleeji luxury sneakers. Authentic, limited, one-of-a-kind."
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&family=Cairo:wght@300;400;500;600;700;800&display=swap"
+          rel="stylesheet"
         />
       </Head>
-      {!mounted ? null : (
-        <AppContent Component={Component} pageProps={pageProps} />
-      )}
+      <AppContent Component={Component} pageProps={pageProps} />
     </>
   );
 }

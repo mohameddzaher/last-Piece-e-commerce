@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { connectDB } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
+import { initSocket } from './realtime/io.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +23,14 @@ import adminRoutes from './routes/admin.js';
 import categoryRoutes from './routes/categories.js';
 import reviewRoutes from './routes/reviews.js';
 import uploadRoutes from './routes/upload.js';
+import brandRoutes from './routes/brands.js';
+import shipmentRoutes from './routes/shipments.js';
+import expenseRoutes from './routes/expenses.js';
+import saleRoutes from './routes/sales.js';
+import siteContentRoutes from './routes/siteContent.js';
+import promoCodeRoutes from './routes/promoCodes.js';
+import referralRoutes from './routes/referrals.js';
+import fxRoutes from './routes/fx.js';
 
 // Load environment variables
 dotenv.config();
@@ -130,6 +140,14 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/shipments', shipmentRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/sales', saleRoutes);
+app.use('/api/site-content', siteContentRoutes);
+app.use('/api/promo-codes', promoCodeRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/fx', fxRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
@@ -139,9 +157,12 @@ app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 5001;
-const server = app.listen(PORT, () => {
+const httpServer = http.createServer(app);
+initSocket(httpServer);
+const server = httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   console.log(`📡 API URL: http://localhost:${PORT}/api`);
+  console.log(`🛰  Socket.IO URL: ws://localhost:${PORT}`);
 });
 
 // Handle unhandled promise rejections

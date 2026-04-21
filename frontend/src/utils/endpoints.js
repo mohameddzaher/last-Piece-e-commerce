@@ -20,6 +20,71 @@ export const productAPI = {
   create: (data) => apiClient.post('/products', data),
   update: (id, data) => apiClient.put(`/products/${id}`, data),
   delete: (id) => apiClient.delete(`/products/${id}`),
+  // Last Piece pipeline
+  getInventory: (bucket) => apiClient.get(`/products/inventory/${bucket}`),
+  bulkLocation: (data) => apiClient.post('/products/bulk/location', data),
+};
+
+export const brandAPI = {
+  getAll: (params) => apiClient.get('/brands', { params }),
+  getBySlug: (slug) => apiClient.get(`/brands/${slug}`),
+  create: (data) => apiClient.post('/brands', data),
+  update: (id, data) => apiClient.put(`/brands/${id}`, data),
+  delete: (id) => apiClient.delete(`/brands/${id}`),
+};
+
+export const shipmentAPI = {
+  getAll: (params) => apiClient.get('/shipments', { params }),
+  getById: (id) => apiClient.get(`/shipments/${id}`),
+  create: (data) => apiClient.post('/shipments', data),
+  update: (id, data) => apiClient.put(`/shipments/${id}`, data),
+  delete: (id) => apiClient.delete(`/shipments/${id}`),
+};
+
+export const expenseAPI = {
+  getAll: (params) => apiClient.get('/expenses', { params }),
+  create: (data) => apiClient.post('/expenses', data),
+  update: (id, data) => apiClient.put(`/expenses/${id}`, data),
+  delete: (id) => apiClient.delete(`/expenses/${id}`),
+  summaryByCategory: (params) => apiClient.get('/expenses/summary/by-category', { params }),
+};
+
+export const saleAPI = {
+  getAll: (params) => apiClient.get('/sales', { params }),
+  create: (data) => apiClient.post('/sales', data),
+};
+
+export const promoCodeAPI = {
+  getAll: () => apiClient.get('/promo-codes'),
+  validate: (data) => apiClient.post('/promo-codes/validate', data),
+  create: (data) => apiClient.post('/promo-codes', data),
+  update: (id, data) => apiClient.put(`/promo-codes/${id}`, data),
+  delete: (id) => apiClient.delete(`/promo-codes/${id}`),
+};
+
+export const referralAPI = {
+  getMine: () => apiClient.get('/referrals/me'),
+  validate: (code) => apiClient.get(`/referrals/validate/${code}`),
+  getAll: () => apiClient.get('/referrals'),
+};
+
+export const siteContentAPI = {
+  getAll: (params) => apiClient.get('/site-content', { params }),
+  getByKey: (key, lang) => apiClient.get(`/site-content/by-key/${key}`, { params: { lang } }),
+  adminAll: () => apiClient.get('/site-content/admin/all'),
+  upsert: (key, data) => apiClient.put(`/site-content/${key}`, data),
+  delete: (key) => apiClient.delete(`/site-content/${key}`),
+};
+
+export const fxAPI = {
+  current: (from = 'SAR', to = 'EGP') => apiClient.get('/fx/current', { params: { from, to } }),
+  history: (from = 'SAR', to = 'EGP', days = 30) => apiClient.get('/fx/history', { params: { from, to, days } }),
+  impact: () => apiClient.get('/fx/impact'),
+  // "Reference rate" — the locked book rate used as default for new purchases.
+  getReferences: (params) => apiClient.get('/fx/reference', { params }),
+  updateReference: (data) => apiClient.put('/fx/reference', data),
+  referenceHistory: (from = 'SAR', to = 'EGP') =>
+    apiClient.get('/fx/reference/history', { params: { from, to } }),
 };
 
 // Cart endpoints
