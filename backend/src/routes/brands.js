@@ -14,10 +14,12 @@ router.get('/', async (req, res, next) => {
     if (limit) q = q.limit(parseInt(limit));
     const [brandDocs, counts] = await Promise.all([
       q.lean(),
-      // B-15: live per-brand product count so the public Brands grid and the
-      // admin Brands table aren't stuck on a stale, manually-maintained number.
+      // B-15: live per-brand product count. Counts every pair we still own
+      // (anything not flagged 'sold'), regardless of which leg of the
+      // pipeline it's on. The previous filter only counted Egypt-online stock
+      // and made every brand show 0 in the admin table.
       Product.aggregate([
-        { $match: { status: 'active', location: { $in: ['egypt-online', 'egypt-both'] } } },
+        { $match: { location: { $ne: 'sold' } } },
         { $group: { _id: '$brandRef', count: { $sum: 1 } } },
       ]),
     ]);

@@ -14,6 +14,8 @@ import {
 import { useAuthStore } from "@/store";
 import { orderAPI } from "@/utils/endpoints";
 import { getProductImageUrl } from "@/utils/formatters";
+import { fmtMoney } from "@/utils/format";
+import { useSocketEvent } from "@/utils/socket";
 import { toast } from "react-toastify";
 
 export default function Orders() {
@@ -44,6 +46,11 @@ export default function Orders() {
       setLoading(false);
     }
   };
+
+  // Live updates so a status change pushed by the admin shows up in this list
+  // without a manual refresh.
+  useSocketEvent('order:status-changed', () => fetchOrders());
+  useSocketEvent('order:created', () => fetchOrders());
 
   const getStatusIcon = (status) => {
     const icons = {
@@ -220,7 +227,7 @@ export default function Orders() {
                       <div className="text-right flex items-center gap-4">
                         <div>
                           <p className="text-xl font-bold text-white tabular-nums">
-                            {`${order.payment?.currency || 'EGP'} ${Math.round(order.pricing?.total || 0).toLocaleString()}`}
+                            {fmtMoney(order.pricing?.total || 0, order.payment?.currency)}
                           </p>
                         </div>
                         <FiChevronRight className="text-gray-500" size={20} />

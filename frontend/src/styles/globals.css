@@ -69,6 +69,17 @@ body.font-arabic h6 {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
+/* Order numbers and SKUs need a true monospace so 0/O don't get confused.
+   Tailwind's `font-mono` class sometimes lost the cascade fight against the
+   next/font body family inherited through `var(--font-sans)`; this overrides
+   with !important so the rule sticks no matter what. */
+.font-mono,
+[class*=" font-mono"],
+[class^="font-mono"] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-feature-settings: "tnum";
+}
+
 /* Brand ticker — continuous horizontal scroll. Shifts by one "set" width
    (we render the same list three times; shifting a third of the whole line
    lands on an identical frame, so the loop reads as seamless). */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import StatCard from '@/components/admin/StatCard';
 import DataTable from '@/components/admin/DataTable';
@@ -10,12 +10,23 @@ import { fmtMoney, fmtPct, fmtDate } from '@/utils/format';
 import { FiTrendingUp, FiDollarSign, FiPackage, FiAlertTriangle } from 'react-icons/fi';
 import { toEGP, ratesFromReferences } from '@/utils/fxConvert';
 
+const PERIOD_DAYS = { '7d': 7, '30d': 30, '90d': 90, all: null };
+const inPeriod = (date, days) => {
+  if (days == null) return true;
+  if (!date) return false;
+  return Date.now() - new Date(date).getTime() < days * 86400000;
+};
+
 export default function AdminFinancial() {
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [orders, setOrders] = useState([]);
   const [fxRates, setFxRates] = useState({ EGP: 1 });
   const [loading, setLoading] = useState(true);
+  // Default to 30d so this page agrees with the Dashboard's default lens —
+  // the QA round flagged that having Dashboard=30d but Financial=all-time
+  // produced two different OpEx numbers and read like a bug.
+  const [period, setPeriod] = useState('30d');
 
   const load = async () => {
     try {
@@ -37,19 +48,27 @@ export default function AdminFinancial() {
   useSocketEvent('expense:created', load);
   useSocketEvent('order:created', load);
 
-  const offlineRevenue = sales.reduce((s, x) => s + (x.total || 0), 0);
-  // Align with the Dashboard — only actually-paid orders count as revenue.
-  const paidOrders = orders.filter((o) => ['completed', 'delivered'].includes(o.payment?.status) || ['delivered'].includes(o.status));
-  const onlineRevenue = paidOrders.reduce((s, x) => s + (x.pricing?.total || 0), 0);
+  const days = PERIOD_DAYS[period];
+
+  const salesP = useMemo(() => sales.filter((x) => inPeriod(x.createdAt, days)), [sales, days]);
+  const ordersP = useMemo(() => orders.filter((x) => inPeriod(x.createdAt, days)), [orders, days]);
+  const expensesP = useMemo(() => expenses.filter((x) => inPeriod(x.incurredOn || x.createdAt, days)), [expenses, days]);
+
+  const offlineRevenue = salesP.reduce((s, x) => s + (x.total || 0), 0);
+  // Match the Dashboard: every non-cancelled order counts as revenue (COD
+  // dominates here, so waiting for `payment.status='completed'` would zero
+  // the report for the first few days).
+  const liveOrders = ordersP.filter((o) => !['cancelled', 'returned'].includes(o.status));
+  const onlineRevenue = liveOrders.reduce((s, x) => s + (x.pricing?.total || 0), 0);
   const revenue = offlineRevenue + onlineRevenue;
-  const cogs = sales.reduce((s, x) => s + (x.totalCost || 0), 0);
-  const grossProfit = sales.reduce((s, x) => s + (x.totalProfit || 0), 0);
-  const opex = expenses.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP', fxRates), 0);
+  const cogs = salesP.reduce((s, x) => s + (x.totalCost || 0), 0);
+  const grossProfit = salesP.reduce((s, x) => s + (x.totalProfit || 0), 0);
+  const opex = expensesP.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP', fxRates), 0);
   const net = grossProfit - opex;
   const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
   // Expenses breakdown
-  const byCategory = expenses.reduce((acc, x) => {
+  const byCategory = expensesP.reduce((acc, x) => {
     const v = toEGP(x.amount || 0, x.currency || 'EGP', fxRates);
     acc[x.category] = (acc[x.category] || 0) + v;
     return acc;
@@ -59,13 +78,31 @@ export default function AdminFinancial() {
     .sort((a, b) => b.amount - a.amount);
 
   return (
-    <AdminLayout title="Financial Report" requiredRoles={['super-admin']}>
+    <AdminLayout
+      title="Financial Report"
+      requiredRoles={['super-admin']}
+      actions={
+        <div className="inline-flex bg-slate-100 dark:bg-slate-800 rounded-full p-0.5">
+          {['7d', '30d', '90d', 'all'].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1 text-[10px] font-semibold uppercase rounded-full transition-colors ${
+                period === p ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow' : 'text-slate-500'
+              }`}
+            >
+              {p === 'all' ? 'All' : `Last ${p}`}
+            </button>
+          ))}
+        </div>
+      }
+    >
       <p className="text-xs text-slate-500 mb-6">
-        Live P&L. Gross profit covers sold inventory; operating expenses track your overhead (salaries, rent, marketing) separately — the way you asked.
+        Live P&amp;L for <strong>{period === 'all' ? 'all time' : `the last ${period}`}</strong>. Switch the period above to match the Dashboard. Gross profit covers sold inventory; operating expenses track your overhead (salaries, rent, marketing) separately.
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatCard label="Revenue" value={fmtMoney(revenue)} sub={`${sales.length} boutique · ${orders.length} online`} icon={FiDollarSign} accent="emerald" />
+        <StatCard label="Revenue" value={fmtMoney(revenue)} sub={`${salesP.length} boutique · ${liveOrders.length} online`} icon={FiDollarSign} accent="emerald" />
         <StatCard label="COGS (Landed)" value={fmtMoney(cogs)} icon={FiPackage} accent="amber" />
         <StatCard label="Gross Profit" value={fmtMoney(grossProfit)} sub={`Margin ${fmtPct(margin)}`} icon={FiTrendingUp} accent="blue" />
         <StatCard label="Operating Expenses" value={fmtMoney(opex)} icon={FiAlertTriangle} accent="rose" />

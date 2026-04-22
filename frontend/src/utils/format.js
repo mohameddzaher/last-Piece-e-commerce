@@ -1,6 +1,12 @@
-export const fmtMoney = (v, currency = 'EGP') => {
+export const fmtMoney = (v, currency) => {
   if (v == null || isNaN(v)) return '—';
-  const symbol = { EGP: 'EGP', SAR: 'SAR', USD: '$' }[currency] || currency;
+  // Last Piece operates in EGP for everything customer-facing. Treat any
+  // missing / falsy / accidentally-defaulted currency as EGP, and never
+  // display "$" — show the ISO code instead so the screen is unambiguous
+  // (a few legacy orders were saved with payment.currency='USD' from the
+  // old schema default; we don't want their totals showing dollar signs).
+  const cur = (currency || 'EGP').toUpperCase();
+  const symbol = { EGP: 'EGP', SAR: 'SAR', USD: 'USD', EUR: 'EUR' }[cur] || cur;
   return `${symbol} ${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 };
 

@@ -111,14 +111,18 @@ if (process.env.NODE_ENV !== 'development') {
   app.use('/api/', apiLimiter);
 }
 
-// Root route
+// Root route. The `build` marker is a manually-bumped string we use to
+// confirm Render actually picked up the latest deploy from main — when this
+// shows up in the response, we know the new code is live.
 app.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'Last Piece API Server',
     version: '1.0.0',
+    build: '2026-04-22-r3',
     status: 'running',
     environment: process.env.NODE_ENV,
+    commit: process.env.RENDER_GIT_COMMIT || 'unknown',
   });
 });
 

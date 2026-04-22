@@ -19,7 +19,7 @@ import { fmtDateTime } from '@/utils/format';
  *  3. One click to "Update to today's market" OR type a custom rate.
  *  4. Every change is logged.
  */
-export default function FxReferenceCard({ pairs = [['SAR', 'EGP'], ['USD', 'EGP']] }) {
+export default function FxReferenceCard({ pairs = [['SAR', 'EGP'], ['USD', 'EGP'], ['EUR', 'EGP']] }) {
   const [refs, setRefs] = useState([]);
   const [live, setLive] = useState({});
   const [editing, setEditing] = useState(null); // {from, to}

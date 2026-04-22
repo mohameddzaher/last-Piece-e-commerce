@@ -9,7 +9,7 @@ import { fxAPI } from '@/utils/endpoints';
  * Shows today's rate + 7-day delta + tiny sparkline per currency pair.
  * Flags moves ≥ 3% (flag set by the backend) as alerts.
  */
-export default function FxRateCard({ pairs = [['SAR', 'EGP'], ['USD', 'EGP']] }) {
+export default function FxRateCard({ pairs = [['SAR', 'EGP'], ['USD', 'EGP'], ['EUR', 'EGP']] }) {
   const [data, setData] = useState({});
   const [history, setHistory] = useState({});
   const [loading, setLoading] = useState(true);

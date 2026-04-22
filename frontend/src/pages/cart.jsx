@@ -15,13 +15,13 @@ export default function Cart() {
   const { isAuthenticated } = useAuthStore();
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
+  const [couponError, setCouponError] = useState('');
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Sync cart with localStorage
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify({ items, total, itemCount }));
-  }, [items, total, itemCount]);
+  // Note: cart is already persisted by zustand under 'lp-cart' (see store).
+  // We removed the legacy duplicate write to 'cart' here — it raced with
+  // zustand's rehydrate and emptied the cart on /cart navigation.
 
   const handleRemoveItem = async (productId) => {
     try {
@@ -48,8 +48,10 @@ export default function Cart() {
   };
 
   const handleApplyCoupon = async () => {
+    setCouponError('');
     if (!couponCode.trim()) return;
     if (!isAuthenticated) {
+      setCouponError('Please sign in to use promo codes.');
       toast.warn('Please sign in to use promo codes');
       return;
     }
@@ -62,6 +64,7 @@ export default function Cart() {
       const data = res.data.data;
       setDiscount(data.discount || 0);
       setCouponApplied(true);
+      setCouponError('');
       if (data.type === 'percent') {
         toast.success(`Promo applied! ${data.value}% off`);
       } else if (data.type === 'fixed') {
@@ -72,7 +75,11 @@ export default function Cart() {
         toast.success('Promo applied');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Invalid promo code');
+      // Surface the failure both as a toast AND inline below the input — the
+      // QA report flagged that the toast alone is easy to miss.
+      const msg = error.response?.data?.message || 'Invalid promo code';
+      setCouponError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -81,6 +88,7 @@ export default function Cart() {
   const handleRemoveCoupon = () => {
     setCouponCode('');
     setCouponApplied(false);
+    setCouponError('');
     setDiscount(0);
   };
 
@@ -93,9 +101,14 @@ export default function Cart() {
     router.push('/checkout');
   };
 
+  // Subtotal = sum of items (server-side cart now sets tax=0 so this matches
+  // the server's cart.subtotal). Shipping threshold matches the checkout
+  // page so the two screens always agree on the same final total.
   const subtotal = total;
-  const shipping = subtotal > 50 ? 0 : 9.99;
-  const finalTotal = subtotal - discount + shipping;
+  const FREE_SHIPPING_OVER = 5000;
+  const FLAT_SHIPPING = 100;
+  const shipping = subtotal >= FREE_SHIPPING_OVER ? 0 : FLAT_SHIPPING;
+  const finalTotal = Math.max(0, subtotal - discount) + shipping;
 
   if (items.length === 0) {
     return (
@@ -251,6 +264,11 @@ export default function Cart() {
                       {loading ? '...' : 'Apply'}
                     </button>
                   </div>
+                )}
+                {couponError && (
+                  <p className='text-[10px] text-rose-400 mt-1.5 flex items-center gap-1'>
+                    <FiX size={10} /> {couponError}
+                  </p>
                 )}
                 <p className='text-[10px] text-gray-500 mt-1.5'>Try: WELCOME10 · FIRSTPAIR500</p>
               </div>

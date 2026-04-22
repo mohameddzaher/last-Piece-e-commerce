@@ -70,7 +70,7 @@ export const addToCart = async (req, res, next) => {
     }
 
     cart.subtotal = subtotal;
-    cart.tax = subtotal * 0.1; // 10% tax
+    cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout total mismatch
     cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
     cart.lastUpdated = new Date();
 
@@ -110,7 +110,7 @@ export const removeFromCart = async (req, res, next) => {
     }
 
     cart.subtotal = subtotal;
-    cart.tax = subtotal * 0.1;
+    cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout total mismatch
     cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
     cart.lastUpdated = new Date();
 
@@ -166,7 +166,7 @@ export const updateCartItem = async (req, res, next) => {
     }
 
     cart.subtotal = subtotal;
-    cart.tax = subtotal * 0.1;
+    cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout total mismatch
     cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
     cart.lastUpdated = new Date();
 

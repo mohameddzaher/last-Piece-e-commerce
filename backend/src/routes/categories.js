@@ -12,10 +12,11 @@ router.get("/", requireDB, async (req, res, next) => {
   try {
     const [categoryDocs, counts] = await Promise.all([
       Category.find({ isActive: true }).sort("order").lean(),
-      // B-15: live product count per category so the public category grid
-      // reflects reality without a manual refresh step.
+      // B-15: live product count per category. Counts everything not 'sold'
+      // so the admin Categories table reflects current ownership; the
+      // previous public-only filter made every category show 0.
       Product.aggregate([
-        { $match: { status: "active", location: { $in: ["egypt-online", "egypt-both"] } } },
+        { $match: { location: { $ne: "sold" } } },
         { $group: { _id: "$category", count: { $sum: 1 } } },
       ]),
     ]);

@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store';
 import { orderAPI } from '@/utils/endpoints';
 import { getProductImageUrl } from '@/utils/formatters';
 import { fmtMoney, fmtDateTime } from '@/utils/format';
+import { useSocketEvent } from '@/utils/socket';
 import { toast } from 'react-toastify';
 
 const STATUS_STEPS = [
@@ -38,15 +39,24 @@ const STATUS_COLOR = {
 export default function OrderDetail() {
   const router = useRouter();
   const { id } = router.query;
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hydrated = useAuthStore((s) => s.hydrated);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); return; }
+    // Wait until _app finishes restoring the session before deciding whether
+    // to bounce. Without this, pasting /orders/:id into a logged-in tab
+    // would race the auth restore, fail the auth check, redirect to /login,
+    // and login would then forward to /dashboard — losing the deep link.
+    if (!hydrated) return;
+    if (!isAuthenticated) {
+      router.push(`/login?next=${encodeURIComponent(`/orders/${id || ''}`)}`);
+      return;
+    }
     if (id) fetchOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isAuthenticated]);
+  }, [id, isAuthenticated, hydrated]);
 
   const fetchOrder = async () => {
     try {
@@ -59,6 +69,15 @@ export default function OrderDetail() {
     } finally { setLoading(false); }
   };
 
+  // Subscribe to live status updates so the timeline reflects admin changes
+  // without a manual refresh. The backend emits to `user:{id}` rooms.
+  useSocketEvent('order:status-changed', (updated) => {
+    if (updated && String(updated._id) === String(id)) setOrder(updated);
+  }, [id]);
+  useSocketEvent('order:created', (updated) => {
+    if (updated && String(updated._id) === String(id)) setOrder(updated);
+  }, [id]);
+
   const handleCancelOrder = async () => {
     if (!confirm('Cancel this order?')) return;
     try {
@@ -68,7 +87,7 @@ export default function OrderDetail() {
     } catch { toast.error('Failed to cancel'); }
   };
 
-  if (!isAuthenticated) return null;
+  if (!hydrated || !isAuthenticated) return null;
 
   if (loading) {
     return (

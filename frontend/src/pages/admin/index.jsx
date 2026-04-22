@@ -115,14 +115,16 @@ export default function AdminDashboard() {
     // Filter transactions to period
     const salesP = sales.filter((s) => inPeriod(s.createdAt, days));
     const ordersP = orders.filter((o) => inPeriod(o.createdAt, days));
-    const paidOrdersP = ordersP.filter((o) => ['completed', 'delivered'].includes(o.payment?.status) || ['delivered'].includes(o.status));
+    // "Live" orders for revenue purposes = anything that hasn't been
+    // cancelled/returned. Cash-on-delivery dominates here, so an order with
+    // payment.status = 'pending' is still booked revenue once it's placed —
+    // waiting for delivery to count it would zero the dashboard for the first
+    // few days of operation. Cancelled/returned subtract out naturally.
+    const liveOrdersP = ordersP.filter((o) => !['cancelled', 'returned'].includes(o.status));
 
-    // B-13: Revenue and AOV must share the same transaction set — only the
-    // transactions that actually produced money (boutique sales + PAID online
-    // orders). Pending/cancelled orders don't count as revenue and shouldn't
-    // inflate or deflate the average order value either.
+    // B-13: Revenue and AOV share the same transaction set.
     const offlineRevenue = salesP.reduce((s, x) => s + (x.total || 0), 0);
-    const onlineRevenue = paidOrdersP.reduce((s, x) => s + (x.pricing?.total || 0), 0);
+    const onlineRevenue = liveOrdersP.reduce((s, x) => s + (x.pricing?.total || 0), 0);
     const totalRevenue = offlineRevenue + onlineRevenue;
 
     const totalCOGS = salesP.reduce((s, x) => s + (x.totalCost || 0), 0);
@@ -132,15 +134,15 @@ export default function AdminDashboard() {
     const opex = expensesP.reduce((s, x) => s + toEGP(x.amount || 0, x.currency || 'EGP', fxRates), 0);
     const netProfit = grossProfit - opex;
 
-    const revenueTxnCount = salesP.length + paidOrdersP.length;
+    const revenueTxnCount = salesP.length + liveOrdersP.length;
     const aov = revenueTxnCount > 0 ? totalRevenue / revenueTxnCount : 0;
     const marginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
-    // B-14: Unique customers = distinct order.userId in the period (online
-    // channel — only place we have a user link). userCount from /admin/stats
-    // is the global total, which is different.
+    // B-14: Unique customers = distinct order.userId in the period across all
+    // live (non-cancelled) orders. A COD customer still counts the moment
+    // they place the order.
     const uniqueCustomerIds = new Set();
-    for (const o of paidOrdersP) {
+    for (const o of liveOrdersP) {
       if (o.userId) uniqueCustomerIds.add(String(o.userId));
     }
     const uniqueCustomers = uniqueCustomerIds.size;
@@ -183,7 +185,7 @@ export default function AdminDashboard() {
       }
     }
     // Also count online orders
-    for (const o of paidOrdersP) {
+    for (const o of liveOrdersP) {
       for (const it of (o.items || [])) {
         const id = String(it.productId || '');
         if (!id) continue;
@@ -216,7 +218,7 @@ export default function AdminDashboard() {
       const revToday = salesP
         .filter((s) => { const t = new Date(s.createdAt); return t >= day && t < next; })
         .reduce((s, x) => s + (x.total || 0), 0)
-        + paidOrdersP
+        + liveOrdersP
           .filter((o) => { const t = new Date(o.createdAt); return t >= day && t < next; })
           .reduce((s, x) => s + (x.pricing?.total || 0), 0);
       series.push({ date: day, revenue: revToday });
@@ -289,7 +291,7 @@ export default function AdminDashboard() {
       activity, alerts,
       onlineOrderCount: ordersP.length,
       offlineSaleCount: salesP.length,
-      paidOrderCount: paidOrdersP.length,
+      paidOrderCount: liveOrdersP.length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales, orders, expenses, inventory, promos, period, fxRates]);

@@ -76,12 +76,31 @@ export const useCartStore = create(
         }),
 
       clearCart: () => set({ items: [], total: 0, itemCount: 0 }),
-      setCart: (cart) =>
-        set({
-          items: cart.items || [],
-          total: cart.total || 0,
-          itemCount: (cart.items || []).reduce((s, i) => s + (i.quantity || 1), 0),
-        }),
+      // Server cart and guest cart had two different item shapes:
+      //   guest:  { productId: '<id string>', name, price, image, quantity }
+      //   server: { productId: { _id, name, thumbnail, ... }, price, quantity }
+      // The cart and checkout pages all assume the guest shape, so the
+      // checkout review broke for logged-in users (no name, no image, just
+      // a placeholder and a price). Normalize on the way in.
+      setCart: (cart) => {
+        const rawItems = cart?.items || [];
+        const items = rawItems.map((i) => {
+          const productObj = typeof i.productId === 'object' && i.productId !== null ? i.productId : null;
+          const productId = productObj?._id ? String(productObj._id) : String(i.productId || '');
+          return {
+            productId,
+            name: i.name || productObj?.name || 'Product',
+            price: i.price ?? productObj?.price ?? 0,
+            image: i.image || productObj?.thumbnail || productObj?.images?.[0]?.url || '',
+            quantity: i.quantity || 1,
+          };
+        });
+        const itemCount = items.reduce((s, i) => s + i.quantity, 0);
+        const total = items.reduce((s, i) => s + (i.price || 0) * i.quantity, 0);
+        // Trust the recomputed total over whatever the server sent — server
+        // cart used to add 10% tax which made cart and checkout disagree.
+        set({ items, total, itemCount });
+      },
     }),
     {
       name: 'lp-cart',
@@ -113,11 +132,20 @@ export const useWishlistStore = create(
       isInWishlist: (productId) => get().items.some((i) => i.productId === productId),
 
       clearWishlist: () => set({ items: [], itemCount: 0 }),
-      setWishlist: (wishlist) =>
-        set({
-          items: wishlist.items || [],
-          itemCount: (wishlist.items || []).length,
-        }),
+      setWishlist: (wishlist) => {
+        const rawItems = wishlist?.items || [];
+        const items = rawItems.map((i) => {
+          const productObj = typeof i.productId === 'object' && i.productId !== null ? i.productId : null;
+          const productId = productObj?._id ? String(productObj._id) : String(i.productId || '');
+          return {
+            productId,
+            name: i.name || productObj?.name || 'Product',
+            price: i.price ?? productObj?.price ?? 0,
+            image: i.image || productObj?.thumbnail || productObj?.images?.[0]?.url || '',
+          };
+        });
+        set({ items, itemCount: items.length });
+      },
     }),
     {
       name: 'lp-wishlist',

@@ -79,11 +79,11 @@ export const emitProductChange = (event, product) => {
   io.to('role:saudi-staff').emit(event, saudiPayload);
   io.to('role:egypt-staff').emit(event, egyptPayload);
 
-  // Broadcast publicly only if the product is visible online.
-  const onlineLocations = ['egypt-online', 'egypt-both'];
-  if (onlineLocations.includes(product?.location) && product?.status === 'active') {
-    io.to('public').emit(event, publicPayload);
-  }
+  // Public listeners need to hear about a product whenever its presence on the
+  // catalog might change — that includes when it becomes online (price tweak),
+  // and equally when it goes offline (sold, moved to Saudi, deactivated). The
+  // client just refetches its filtered list, which won't include sold pairs.
+  io.to('public').emit(event, publicPayload);
 };
 
 export const emitShipmentChange = (event, shipment) =>

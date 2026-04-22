@@ -46,7 +46,7 @@ const cairo = Cairo({
 // This component is only rendered after mount, so router is available.
 function AppContent({ Component, pageProps }) {
   const router = useRouter();
-  const { isAuthenticated, setUser, setTokens } = useAuthStore();
+  const { isAuthenticated, setUser, setTokens, setHydrated } = useAuthStore();
   const setCart = useCartStore((state) => state.setCart);
   const setWishlist = useWishlistStore((state) => state.setWishlist);
   const initI18n = useI18n((s) => s.init);
@@ -91,18 +91,22 @@ function AppContent({ Component, pageProps }) {
           console.error("Error fetching profile:", err);
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
-        });
+        })
+        .finally(() => setHydrated(true));
+    } else {
+      // No token to restore — auth state is already final.
+      setHydrated(true);
     }
 
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (error) {
-        console.error("Error loading cart:", error);
-      }
+    // The cart is now persisted by zustand under the 'lp-cart' key with its
+    // own rehydration. The legacy 'cart' key was an older parallel store;
+    // reading it here would *clobber* the freshly-hydrated zustand state
+    // with an empty {items:[]} on every navigation (the bug the QA round
+    // labelled B-17). Just remove the stale key once and stop reading it.
+    if (typeof window !== 'undefined' && localStorage.getItem('cart')) {
+      localStorage.removeItem('cart');
     }
-  }, [setTokens, setUser, setCart]);
+  }, [setTokens, setUser, setHydrated]);
 
   useEffect(() => {
     if (isAuthenticated) {

@@ -30,8 +30,12 @@ export default function Login() {
   });
 
   useEffect(() => {
+    // Honour ?next=... so deep links (e.g. an emailed order detail link) bring
+    // the user back where they wanted to go after authenticating, instead of
+    // dumping them on /dashboard.
     if (isAuthenticated) {
-      router.push('/dashboard');
+      const next = typeof router.query.next === 'string' ? router.query.next : '/dashboard';
+      router.push(next);
     }
   }, [isAuthenticated, router]);
 
@@ -52,7 +56,8 @@ export default function Login() {
         localStorage.setItem('accessToken', res.data.data.tokens.accessToken);
         localStorage.setItem('refreshToken', res.data.data.tokens.refreshToken);
         toast.success('Welcome back!');
-        router.push('/dashboard');
+        const next = typeof router.query.next === 'string' ? router.query.next : '/dashboard';
+        router.push(next);
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Login failed. Please check your credentials.');
