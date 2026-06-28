@@ -26,9 +26,10 @@ export default function AdminProducts() {
   };
   useEffect(() => { load(); }, []);
 
-  useSocketEvent('product:created', load);
-  useSocketEvent('product:updated', load);
-  useSocketEvent('product:deleted', load);
+  const DB = { debounceMs: 500 };
+  useSocketEvent('product:created', load, [], DB);
+  useSocketEvent('product:updated', load, [], DB);
+  useSocketEvent('product:deleted', load, [], DB);
 
   const del = async (id) => {
     if (!confirm('Delete this product?')) return;

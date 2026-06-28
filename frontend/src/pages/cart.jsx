@@ -11,7 +11,7 @@ import { toast } from 'react-toastify';
 
 export default function Cart() {
   const router = useRouter();
-  const { items, total, itemCount, removeItem, updateQuantity, clearCart } = useCartStore();
+  const { items, total, itemCount, removeItem, updateQuantity, clearCart, setPromo } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
@@ -65,6 +65,8 @@ export default function Cart() {
       setDiscount(data.discount || 0);
       setCouponApplied(true);
       setCouponError('');
+      // Persist to the store so checkout can re-send the code (backend re-validates).
+      setPromo({ code: data.code, discount: data.discount || 0, freeShipping: !!data.freeShipping });
       if (data.type === 'percent') {
         toast.success(`Promo applied! ${data.value}% off`);
       } else if (data.type === 'fixed') {
@@ -90,6 +92,7 @@ export default function Cart() {
     setCouponApplied(false);
     setCouponError('');
     setDiscount(0);
+    setPromo(null);
   };
 
   const handleCheckout = () => {

@@ -1,6 +1,28 @@
+import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { generateTokens, generateVerificationToken, hashToken, sanitizeUser } from '../utils/helpers.js';
 import { sendEmailVerification, sendPasswordReset } from '../utils/email.js';
+
+// Also expose the tokens as httpOnly cookies. These are immune to JS/XSS theft
+// (unlike localStorage) and are used automatically when frontend + backend share
+// a domain. Cross-origin deploys fall back to the Bearer header — harmless here.
+const cookieOpts = (maxAgeMs) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: maxAgeMs,
+});
+
+const setAuthCookies = (res, { accessToken, refreshToken }) => {
+  res.cookie('accessToken', accessToken, cookieOpts(7 * 24 * 60 * 60 * 1000));
+  if (refreshToken) res.cookie('refreshToken', refreshToken, cookieOpts(30 * 24 * 60 * 60 * 1000));
+};
+
+export const logout = async (_req, res) => {
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+  res.status(200).json({ success: true, message: 'Logged out' });
+};
 
 export const register = async (req, res, next) => {
   try {
@@ -132,6 +154,7 @@ export const login = async (req, res, next) => {
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+    setAuthCookies(res, { accessToken, refreshToken });
 
     res.status(200).json({
       success: true,
@@ -141,6 +164,39 @@ export const login = async (req, res, next) => {
         tokens: { accessToken, refreshToken },
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Exchange a valid (30d) refresh token for a fresh (7d) access token.
+ * Lets the SPA keep a session alive without forcing re-login when the short
+ * access token expires mid-session. Rotates the refresh token too.
+ */
+export const refreshAccessToken = async (req, res, next) => {
+  try {
+    const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, message: 'Refresh token is required' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
+    }
+
+    // Confirm the user still exists and isn't blocked before re-issuing.
+    const user = await User.findById(decoded.id).select('role status').lean();
+    if (!user || user.status === 'blocked') {
+      return res.status(401).json({ success: false, message: 'Account is no longer active' });
+    }
+
+    const tokens = generateTokens(decoded.id, user.role);
+    setAuthCookies(res, tokens);
+    res.status(200).json({ success: true, data: { tokens } });
   } catch (error) {
     next(error);
   }

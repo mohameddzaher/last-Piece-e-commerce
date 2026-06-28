@@ -40,17 +40,36 @@ export const reconnectSocket = () => {
  * Subscribe to a socket event for the lifetime of a component.
  * Usage:
  *   useSocketEvent('product:updated', (p) => { ... });
+ *   useSocketEvent('product:updated', reload, [], { debounceMs: 400 });
+ *
+ * `debounceMs` coalesces bursts of the same event into a single handler call.
+ * Critical at scale: when one admin edits a product the server broadcasts to
+ * every connected client, and a handler that triggers a full refetch would
+ * otherwise have every open tab stampede the API on each event. Debouncing
+ * collapses a flurry of edits into one refetch.
  */
-export const useSocketEvent = (event, handler, deps = []) => {
+export const useSocketEvent = (event, handler, deps = [], options = {}) => {
+  const { debounceMs = 0 } = options;
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
 
   useEffect(() => {
     const s = getSocket();
     if (!s) return;
-    const fn = (payload) => handlerRef.current?.(payload);
+    let timer = null;
+    const fn = (payload) => {
+      if (debounceMs > 0) {
+        clearTimeout(timer);
+        timer = setTimeout(() => handlerRef.current?.(payload), debounceMs);
+      } else {
+        handlerRef.current?.(payload);
+      }
+    };
     s.on(event, fn);
-    return () => s.off(event, fn);
+    return () => {
+      clearTimeout(timer);
+      s.off(event, fn);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, ...deps]);
+  }, [event, debounceMs, ...deps]);
 };

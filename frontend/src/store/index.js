@@ -13,6 +13,11 @@ export const useAuthStore = create((set) => ({
   setHydrated: (v = true) => set({ hydrated: v }),
   logout: () => {
     set({ user: null, isAuthenticated: false, tokens: null });
+    // Clear the httpOnly auth cookies server-side (best-effort; the Bearer path
+    // is cleared below by wiping localStorage).
+    if (typeof window !== 'undefined') {
+      import('@/utils/endpoints').then((m) => m.authAPI.logout().catch(() => {})).catch(() => {});
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('cart');
       localStorage.removeItem('wishlist');
@@ -37,6 +42,11 @@ export const useCartStore = create(
       items: [],
       total: 0,
       itemCount: 0,
+      // Promo applied in the cart, carried to checkout so it isn't lost on
+      // navigation. The backend re-validates it on order creation — this is
+      // only a UI hint, never the source of the charged amount.
+      appliedPromo: null, // { code, discount, freeShipping }
+      setPromo: (promo) => set({ appliedPromo: promo }),
 
       addItem: (item) =>
         set((state) => {
@@ -75,7 +85,7 @@ export const useCartStore = create(
           };
         }),
 
-      clearCart: () => set({ items: [], total: 0, itemCount: 0 }),
+      clearCart: () => set({ items: [], total: 0, itemCount: 0, appliedPromo: null }),
       // Server cart and guest cart had two different item shapes:
       //   guest:  { productId: '<id string>', name, price, image, quantity }
       //   server: { productId: { _id, name, thumbnail, ... }, price, quantity }
@@ -106,7 +116,12 @@ export const useCartStore = create(
       name: 'lp-cart',
       storage: createJSONStorage(() => (typeof window !== 'undefined' ? localStorage : null)),
       // Persist only the cart data, not function refs.
-      partialize: (state) => ({ items: state.items, total: state.total, itemCount: state.itemCount }),
+      partialize: (state) => ({
+        items: state.items,
+        total: state.total,
+        itemCount: state.itemCount,
+        appliedPromo: state.appliedPromo,
+      }),
     },
   ),
 );

@@ -187,10 +187,13 @@ export default function Home() {
     }).catch(() => {});
   }, []);
 
-  useSocketEvent('product:created', fetchProducts);
-  useSocketEvent('product:updated', fetchProducts);
-  useSocketEvent('product:deleted', fetchProducts);
-  useSocketEvent('review:created', fetchReviews);
+  // Debounce: every visitor's tab listens to these broadcasts, so an admin
+  // editing several products shouldn't trigger a refetch-per-edit on each tab.
+  const DB = { debounceMs: 500 };
+  useSocketEvent('product:created', fetchProducts, [], DB);
+  useSocketEvent('product:updated', fetchProducts, [], DB);
+  useSocketEvent('product:deleted', fetchProducts, [], DB);
+  useSocketEvent('review:created', fetchReviews, [], DB);
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();

@@ -2,7 +2,10 @@ import jwt from 'jsonwebtoken';
 
 export const protect = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    // Accept the token from the Authorization header (cross-origin SPA, primary)
+    // OR an httpOnly cookie (set on login/refresh; usable when frontend and
+    // backend share a domain). Header wins if both are present.
+    const token = req.headers.authorization?.split(' ')[1] || req.cookies?.accessToken;
 
     if (!token) {
       return res.status(401).json({

@@ -100,12 +100,15 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => { if (role) load(); }, [role]);
-  useSocketEvent('dashboard:refresh', () => load(), [role]);
-  useSocketEvent('product:created', () => load(), [role]);
-  useSocketEvent('product:updated', () => load(), [role]);
-  useSocketEvent('sale:created', () => load(), [role]);
-  useSocketEvent('order:created', () => load(), [role]);
-  useSocketEvent('expense:created', () => load(), [role]);
+  // Each load() fans out into several dashboard queries. Debounce so a burst of
+  // edits/orders coalesces into one refresh instead of stampeding the API.
+  const DB = { debounceMs: 600 };
+  useSocketEvent('dashboard:refresh', () => load(), [role], DB);
+  useSocketEvent('product:created', () => load(), [role], DB);
+  useSocketEvent('product:updated', () => load(), [role], DB);
+  useSocketEvent('sale:created', () => load(), [role], DB);
+  useSocketEvent('order:created', () => load(), [role], DB);
+  useSocketEvent('expense:created', () => load(), [role], DB);
 
   /* ---------- derived analytics ---------- */
 

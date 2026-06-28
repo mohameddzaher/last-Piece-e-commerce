@@ -10,17 +10,9 @@ const referralSchema = new mongoose.Schema(
     refereeReward: { type: Number, default: 10 }, // percent or amount given to new buyer
     currency: { type: String, default: 'EGP' },
 
-    invitations: [
-      {
-        invitedEmail: String,
-        invitedUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        signedUpAt: Date,
-        firstOrder: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
-        firstOrderAt: Date,
-        rewardPaid: { type: Boolean, default: false },
-        rewardAmount: Number,
-      },
-    ],
+    // Individual invitations live in the `ReferralInvitation` collection (a power
+    // referrer could invite thousands — an embedded array would grow unbounded
+    // on one document). The rollup counters below stay denormalized for fast reads.
 
     totalInvited: { type: Number, default: 0 },
     totalConverted: { type: Number, default: 0 },

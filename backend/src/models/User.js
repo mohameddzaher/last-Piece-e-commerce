@@ -108,6 +108,13 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// email already gets a unique index from `unique: true`. These cover the
+// password-reset / email-verify lookups (otherwise full collection scans on
+// every attempt — a DoS vector at scale) and the admin user-list filters.
+userSchema.index({ passwordResetToken: 1 });
+userSchema.index({ emailVerificationToken: 1 });
+userSchema.index({ role: 1, status: 1 });
+
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();

@@ -34,11 +34,12 @@ export default function InventoryPage({ bucket, title, description, requiredRole
   };
   useEffect(() => { load(); }, [bucket]);
 
-  useSocketEvent('product:created', () => load());
-  useSocketEvent('product:updated', () => load());
-  useSocketEvent('product:deleted', () => load());
-  useSocketEvent('shipment:updated', () => load());
-  useSocketEvent('shipment:created', () => load());
+  const DB = { debounceMs: 500 };
+  useSocketEvent('product:created', () => load(), [], DB);
+  useSocketEvent('product:updated', () => load(), [], DB);
+  useSocketEvent('product:deleted', () => load(), [], DB);
+  useSocketEvent('shipment:updated', () => load(), [], DB);
+  useSocketEvent('shipment:created', () => load(), [], DB);
 
   const isSuper = role === 'super-admin' || role === 'admin';
   const isSaudi = role === 'saudi-staff';

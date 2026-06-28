@@ -3,7 +3,6 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import { calculatePagination } from '../utils/helpers.js';
 import bcrypt from 'bcryptjs';
-import xlsx from 'xlsx';
 
 // Users Management
 export const getUsers = async (req, res, next) => {
@@ -559,105 +558,107 @@ export const getFinancialReport = async (req, res, next) => {
   }
 };
 
-// Export Products to Excel
+// --- CSV streaming helper -------------------------------------------------
+// The old exports loaded the WHOLE collection into memory and ran synchronous
+// xlsx.write, which OOMs and blocks the event loop for every other request as
+// data grows. SheetJS has no good streaming API, so we stream CSV instead: a
+// Mongoose cursor feeds rows one at a time, keeping memory flat at any scale.
+// CSV opens directly in Excel/Sheets. A UTF-8 BOM keeps Arabic text correct.
+const csvCell = (val) => {
+  if (val === null || val === undefined) return '';
+  const s = String(val);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+const streamCsv = async (res, filename, headers, cursor, rowMapper) => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+  res.write('﻿'); // UTF-8 BOM
+  res.write(headers.map(csvCell).join(',') + '\n');
+  for await (const doc of cursor) {
+    res.write(rowMapper(doc).map(csvCell).join(',') + '\n');
+  }
+  res.end();
+};
+
+// Export Products to CSV (streamed)
 export const exportProducts = async (req, res, next) => {
   try {
-    const products = await Product.find().lean();
-
-    const data = products.map(p => ({
-      'ID': p._id.toString(),
-      'Name': p.name,
-      'SKU': p.sku || '',
-      'Brand': p.brand || '',
-      'Category': p.category || '',
-      'Price': p.price,
-      'Sale Price': p.salePrice || '',
-      'Status': p.status,
-      'Total Stock': p.sizes?.reduce((acc, s) => acc + (s.stock || 0), 0) || 0,
-      'Sizes': p.sizes?.map(s => `${s.size}(${s.stock})`).join(', ') || '',
-      'Colors': p.colors?.join(', ') || '',
-      'Created At': p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '',
-    }));
-
-    const worksheet = xlsx.utils.json_to_sheet(data);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Products');
-
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=products.xlsx');
-    res.send(buffer);
+    const headers = ['ID', 'Name', 'SKU', 'Brand', 'Category', 'Price', 'Status', 'Stock', 'Location', 'Created At'];
+    const cursor = Product.find().lean().cursor();
+    await streamCsv(res, 'products.csv', headers, cursor, (p) => [
+      p._id.toString(),
+      p.name,
+      p.sku || '',
+      p.brand || '',
+      p.category || '',
+      p.price,
+      p.status,
+      p.stock ?? '',
+      p.location || '',
+      p.createdAt ? new Date(p.createdAt).toISOString().slice(0, 10) : '',
+    ]);
   } catch (error) {
     next(error);
   }
 };
 
-// Export Users to Excel
+// Export Users to CSV (streamed)
 export const exportUsers = async (req, res, next) => {
   try {
-    const users = await User.find().select('-password -emailVerificationToken -passwordResetToken').lean();
-
-    const data = users.map(u => ({
-      'ID': u._id.toString(),
-      'First Name': u.firstName,
-      'Last Name': u.lastName,
-      'Email': u.email,
-      'Phone': u.phone || '',
-      'Role': u.role,
-      'Status': u.status,
-      'Email Verified': u.emailVerified ? 'Yes' : 'No',
-      'Created At': u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '',
-      'Last Login': u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '',
-    }));
-
-    const worksheet = xlsx.utils.json_to_sheet(data);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Users');
-
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=users.xlsx');
-    res.send(buffer);
+    const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Role', 'Status', 'Email Verified', 'Created At', 'Last Login'];
+    const cursor = User.find()
+      .select('-password -emailVerificationToken -passwordResetToken')
+      .lean()
+      .cursor();
+    await streamCsv(res, 'users.csv', headers, cursor, (u) => [
+      u._id.toString(),
+      u.firstName,
+      u.lastName,
+      u.email,
+      u.phone || '',
+      u.role,
+      u.status,
+      u.emailVerified ? 'Yes' : 'No',
+      u.createdAt ? new Date(u.createdAt).toISOString().slice(0, 10) : '',
+      u.lastLogin ? new Date(u.lastLogin).toISOString().slice(0, 10) : '',
+    ]);
   } catch (error) {
     next(error);
   }
 };
 
-// Export Orders to Excel
+// Export Orders to CSV (streamed). Optional ?from&to date range to scope big sets.
 export const exportOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find()
+    const filter = {};
+    if (req.query.from || req.query.to) {
+      filter.createdAt = {};
+      if (req.query.from) filter.createdAt.$gte = new Date(req.query.from);
+      if (req.query.to) filter.createdAt.$lte = new Date(req.query.to);
+    }
+    const headers = ['Order Number', 'Customer Name', 'Customer Email', 'Status', 'Payment Method', 'Payment Status', 'Subtotal', 'Shipping', 'Discount', 'Total', 'Items', 'Shipping Address', 'Created At'];
+    const cursor = Order.find(filter)
       .populate('userId', 'firstName lastName email')
-      .lean();
-
-    const data = orders.map(o => ({
-      'Order Number': o.orderNumber,
-      'Customer Name': o.userId ? `${o.userId.firstName} ${o.userId.lastName}` : 'Guest',
-      'Customer Email': o.userId?.email || o.shippingAddress?.email || '',
-      'Status': o.status,
-      'Payment Method': o.payment?.method || '',
-      'Payment Status': o.payment?.status || '',
-      'Subtotal': o.pricing?.subtotal || 0,
-      'Shipping': o.pricing?.shipping || 0,
-      'Discount': o.pricing?.discount || 0,
-      'Total': o.pricing?.total || 0,
-      'Items Count': o.items?.length || 0,
-      'Shipping Address': o.shippingAddress ?
-        `${o.shippingAddress.street}, ${o.shippingAddress.city}, ${o.shippingAddress.state} ${o.shippingAddress.zipCode}` : '',
-      'Created At': o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
-    }));
-
-    const worksheet = xlsx.utils.json_to_sheet(data);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Orders');
-
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=orders.xlsx');
-    res.send(buffer);
+      .lean()
+      .cursor();
+    await streamCsv(res, 'orders.csv', headers, cursor, (o) => [
+      o.orderNumber,
+      o.userId ? `${o.userId.firstName} ${o.userId.lastName}` : 'Guest',
+      o.userId?.email || o.shippingAddress?.email || '',
+      o.status,
+      o.payment?.method || '',
+      o.payment?.status || '',
+      o.pricing?.subtotal || 0,
+      o.pricing?.shipping || 0,
+      o.pricing?.discount || 0,
+      o.pricing?.total || 0,
+      o.items?.length || 0,
+      o.shippingAddress
+        ? `${o.shippingAddress.street || ''}, ${o.shippingAddress.city || ''}, ${o.shippingAddress.state || ''} ${o.shippingAddress.postalCode || o.shippingAddress.zipCode || ''}`
+        : '',
+      o.createdAt ? new Date(o.createdAt).toISOString().slice(0, 10) : '',
+    ]);
   } catch (error) {
     next(error);
   }

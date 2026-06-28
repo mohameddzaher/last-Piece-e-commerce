@@ -112,9 +112,11 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-orderSchema.index({ userId: 1 });
-orderSchema.index({ orderNumber: 1 });
-orderSchema.index({ status: 1 });
+// Compound indexes serve the two hot order views with filter+sort from one
+// index: customer "my orders" (userId + recency) and admin board (status +
+// recency). orderNumber already has a unique index from `unique: true`.
+orderSchema.index({ userId: 1, createdAt: -1 });
+orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ createdAt: -1 });
 
 export default mongoose.model('Order', orderSchema);

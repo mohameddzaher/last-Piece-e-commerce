@@ -31,6 +31,10 @@ export default function Wishlist() {
       if (isAuthenticated) {
         await cartAPI.add({ productId: item.productId, quantity: 1 });
       }
+      // The zustand store (lp-cart) is the single source of truth for the cart.
+      // The old block here wrote a legacy `cart` localStorage key that _app.jsx
+      // deliberately deletes on every mount (bug B-17: it clobbered the real
+      // cart). Writing it back resurrected that bug — removed.
       addToCart({
         productId: item.productId,
         name: item.name,
@@ -38,23 +42,6 @@ export default function Wishlist() {
         image: item.image,
         quantity: 1,
       });
-
-      // Save to localStorage
-      const cart = JSON.parse(localStorage.getItem('cart') || '{"items":[],"total":0}');
-      const existingItem = cart.items.find((i) => i.productId === item.productId);
-      if (existingItem) {
-        existingItem.quantity += 1;
-      } else {
-        cart.items.push({
-          productId: item.productId,
-          name: item.name,
-          price: item.price,
-          image: item.image,
-          quantity: 1,
-        });
-      }
-      cart.total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-      localStorage.setItem('cart', JSON.stringify(cart));
 
       toast.success('Added to cart!');
     } catch (error) {

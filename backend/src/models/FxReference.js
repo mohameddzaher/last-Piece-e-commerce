@@ -20,16 +20,8 @@ const fxReferenceSchema = new mongoose.Schema(
     source: { type: String, enum: ['live', 'manual'], default: 'manual' },
     liveRateAtSet: Number, // the market rate at the moment of setting — for audit
     note: String,
-    history: [
-      {
-        rate: Number,
-        setAt: { type: Date, default: Date.now },
-        setBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        source: String,
-        liveRateAtSet: Number,
-        note: String,
-      },
-    ],
+    // Change log lives in the `FxRateHistory` collection (see fx.js), not an
+    // embedded array — keeps this doc small and the timeline paginable.
   },
   { timestamps: true }
 );

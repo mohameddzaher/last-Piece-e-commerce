@@ -2,6 +2,8 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -38,6 +40,12 @@ dotenv.config();
 
 // Initialize app
 const app = express();
+
+// Behind Render/Netlify/any reverse proxy, the real client IP is in
+// X-Forwarded-For. Without this, express-rate-limit keys every request to the
+// proxy IP (so one user's burst throttles everyone) and throws a validation
+// error. Trust the first proxy hop only.
+app.set('trust proxy', 1);
 
 // Connect to database, then seed FX defaults so the admin Dashboard's rate
 // cards (SAR, USD, EUR) aren't blank on a fresh deploy.
@@ -92,6 +100,9 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// gzip responses — cuts JSON/list payload bandwidth dramatically under load.
+app.use(compression());
+
 // Body parser middleware with security limits
 app.use(express.json({
   limit: '10mb',
@@ -105,6 +116,9 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ limit: '10mb', extended: true, parameterLimit: 10000 }));
+
+// Parse cookies so auth can read an httpOnly token cookie (set on login/refresh).
+app.use(cookieParser());
 
 // Rate limiting - skip in development if causing issues
 if (process.env.NODE_ENV !== 'development') {
@@ -172,6 +186,24 @@ const server = httpServer.listen(PORT, () => {
   console.log(`📡 API URL: http://localhost:${PORT}/api`);
   console.log(`🛰  Socket.IO URL: ws://localhost:${PORT}`);
 });
+
+// Graceful shutdown — on SIGTERM (Render redeploy/scale-down) stop accepting
+// new connections, let in-flight requests finish, then close DB cleanly so we
+// don't drop active checkouts or leak Atlas connections.
+const shutdown = (signal) => {
+  console.log(`\n${signal} received — shutting down gracefully...`);
+  httpServer.close(async () => {
+    try {
+      const { disconnectDB } = await import('./config/database.js');
+      await disconnectDB();
+    } catch { /* ignore */ }
+    process.exit(0);
+  });
+  // Hard-exit if connections don't drain in time.
+  setTimeout(() => process.exit(1), 15000).unref();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {

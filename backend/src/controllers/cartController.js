@@ -1,6 +1,21 @@
 import Cart from '../models/Cart.js';
 import Product from '../models/Product.js';
 
+// Recompute totals from the prices already stored on each cart item. The old
+// code re-fetched every product on every cart mutation (an N+1 on the busiest
+// authenticated endpoint); the item price is captured at add-time and refreshed
+// whenever the product is re-added, so an in-memory reduce is both correct and
+// O(1) queries.
+const recalcCartTotals = (cart) => {
+  cart.subtotal = cart.items.reduce(
+    (sum, item) => sum + (item.price || 0) * item.quantity,
+    0
+  );
+  cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout mismatch
+  cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
+  cart.lastUpdated = new Date();
+};
+
 export const getCart = async (req, res, next) => {
   try {
     let cart = await Cart.findOne({ userId: req.user.id }).populate('items.productId');
@@ -54,6 +69,8 @@ export const addToCart = async (req, res, next) => {
 
     if (existingItem) {
       existingItem.quantity += quantity;
+      // Keep the stored price fresh in case the catalog price changed.
+      existingItem.price = product.price;
     } else {
       cart.items.push({
         productId,
@@ -62,17 +79,7 @@ export const addToCart = async (req, res, next) => {
       });
     }
 
-    // Recalculate totals
-    let subtotal = 0;
-    for (const item of cart.items) {
-      const prod = await Product.findById(item.productId);
-      subtotal += prod.price * item.quantity;
-    }
-
-    cart.subtotal = subtotal;
-    cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout total mismatch
-    cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
-    cart.lastUpdated = new Date();
+    recalcCartTotals(cart);
 
     await cart.save();
     await cart.populate('items.productId');
@@ -102,17 +109,7 @@ export const removeFromCart = async (req, res, next) => {
 
     cart.items = cart.items.filter((item) => item.productId.toString() !== productId);
 
-    // Recalculate totals
-    let subtotal = 0;
-    for (const item of cart.items) {
-      const product = await Product.findById(item.productId);
-      subtotal += product.price * item.quantity;
-    }
-
-    cart.subtotal = subtotal;
-    cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout total mismatch
-    cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
-    cart.lastUpdated = new Date();
+    recalcCartTotals(cart);
 
     await cart.save();
     await cart.populate('items.productId');
@@ -158,17 +155,7 @@ export const updateCartItem = async (req, res, next) => {
 
     item.quantity = quantity;
 
-    // Recalculate totals
-    let subtotal = 0;
-    for (const cartItem of cart.items) {
-      const product = await Product.findById(cartItem.productId);
-      subtotal += product.price * cartItem.quantity;
-    }
-
-    cart.subtotal = subtotal;
-    cart.tax = 0; // No VAT on consumer side — tax was inflating cart vs checkout total mismatch
-    cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount;
-    cart.lastUpdated = new Date();
+    recalcCartTotals(cart);
 
     await cart.save();
     await cart.populate('items.productId');

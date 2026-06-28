@@ -20,14 +20,9 @@ const promoCodeSchema = new mongoose.Schema(
     usageLimit: { type: Number, default: 0 }, // 0 = unlimited
     usageLimitPerUser: { type: Number, default: 1 },
     usedCount: { type: Number, default: 0 },
-    usedBy: [
-      {
-        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
-        usedAt: { type: Date, default: Date.now },
-        discountApplied: Number,
-      },
-    ],
+    // Individual redemptions live in the `PromoRedemption` collection (indexed by
+    // code+user) — an embedded array would grow unbounded on a popular code and
+    // turn the per-user limit check into an in-memory scan.
 
     startsAt: Date,
     expiresAt: Date,

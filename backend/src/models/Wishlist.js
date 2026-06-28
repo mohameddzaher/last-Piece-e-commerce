@@ -27,6 +27,6 @@ const wishlistSchema = new mongoose.Schema(
   }
 );
 
-wishlistSchema.index({ userId: 1 });
+// userId already has a unique index from `unique: true` — no separate index needed.
 
 export default mongoose.model('Wishlist', wishlistSchema);

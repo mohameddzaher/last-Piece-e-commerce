@@ -56,8 +56,10 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-reviewSchema.index({ productId: 1 });
+// Product review list: find({ productId, status }).sort(createdAt desc) from one index.
+reviewSchema.index({ productId: 1, status: 1, createdAt: -1 });
+// Homepage/featured store reviews.
+reviewSchema.index({ isStoreReview: 1, status: 1, isFeatured: 1 });
 reviewSchema.index({ userId: 1 });
-reviewSchema.index({ status: 1 });
 
 export default mongoose.model('Review', reviewSchema);

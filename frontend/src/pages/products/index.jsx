@@ -83,9 +83,11 @@ export default function ProductsPage() {
     brandAPI.getAll().then((r) => setBrands(r.data.data || [])).catch(() => {});
   }, []);
 
-  useSocketEvent('product:created', load, [JSON.stringify(filters)]);
-  useSocketEvent('product:updated', load, [JSON.stringify(filters)]);
-  useSocketEvent('product:deleted', load, [JSON.stringify(filters)]);
+  // Debounce: coalesce bursts of catalog edits into a single refetch per tab.
+  const DB = { debounceMs: 500 };
+  useSocketEvent('product:created', load, [JSON.stringify(filters)], DB);
+  useSocketEvent('product:updated', load, [JSON.stringify(filters)], DB);
+  useSocketEvent('product:deleted', load, [JSON.stringify(filters)], DB);
 
   const setQuery = (patch) => {
     const next = { ...router.query, ...patch };

@@ -38,9 +38,16 @@ export const connectDB = async (uriIndex = 0, retryCount = 0) => {
 
   try {
     const options = {
-      maxPoolSize: 10,
+      // Pool sizing tuned for high concurrency. With a single app instance,
+      // ~50 sockets keeps the event loop fed without exhausting Atlas's
+      // connection cap. minPoolSize keeps warm sockets ready for traffic spikes.
+      maxPoolSize: Number(process.env.MONGO_MAX_POOL || 50),
+      minPoolSize: Number(process.env.MONGO_MIN_POOL || 5),
+      maxIdleTimeMS: 30000,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      // Fail fast on slow queries instead of piling up connections under load.
+      waitQueueTimeoutMS: 10000,
       family: 4,
     };
 

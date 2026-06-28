@@ -54,10 +54,10 @@ export const addToWishlist = async (req, res, next) => {
     }
 
     wishlist.items.push({ productId });
-    product.wishlistCount += 1;
-
     await wishlist.save();
-    await product.save();
+    // Atomic counter — read-modify-write would lose updates under concurrent
+    // add/remove on a popular product.
+    Product.updateOne({ _id: productId }, { $inc: { wishlistCount: 1 } }).catch(() => {});
     await wishlist.populate('items.productId');
 
     res.status(200).json({
@@ -93,14 +93,12 @@ export const removeFromWishlist = async (req, res, next) => {
     }
 
     wishlist.items.splice(itemIndex, 1);
-
-    const product = await Product.findById(productId);
-    if (product && product.wishlistCount > 0) {
-      product.wishlistCount -= 1;
-      await product.save();
-    }
-
     await wishlist.save();
+    // Atomic decrement, clamped at 0 so it can't go negative under races.
+    Product.updateOne(
+      { _id: productId, wishlistCount: { $gt: 0 } },
+      { $inc: { wishlistCount: -1 } }
+    ).catch(() => {});
     await wishlist.populate('items.productId');
 
     res.status(200).json({

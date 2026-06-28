@@ -85,8 +85,13 @@ export const hashToken = (token) => {
 };
 
 export const calculatePagination = (page = 1, limit = 10) => {
-  const pageNum = Math.max(1, parseInt(page));
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+  // parseInt of garbage ("abc") is NaN, and Math.max/min propagate NaN — which
+  // would reach .skip()/.limit() and break the query. Coerce NaN back to the
+  // safe default so a malformed ?page=abc&limit=xyz can never DoS a query.
+  const rawPage = parseInt(page, 10);
+  const rawLimit = parseInt(limit, 10);
+  const pageNum = Math.max(1, Number.isNaN(rawPage) ? 1 : rawPage);
+  const limitNum = Math.min(100, Math.max(1, Number.isNaN(rawLimit) ? 10 : rawLimit));
   const skip = (pageNum - 1) * limitNum;
 
   return { skip, limit: limitNum, page: pageNum };

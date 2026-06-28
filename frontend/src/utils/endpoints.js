@@ -4,6 +4,8 @@ import apiClient from './api';
 export const authAPI = {
   register: (data) => apiClient.post('/auth/register', data),
   login: (data) => apiClient.post('/auth/login', data),
+  logout: () => apiClient.post('/auth/logout'),
+  refresh: (data) => apiClient.post('/auth/refresh', data),
   verifyEmail: (data) => apiClient.post('/auth/verify-email', data),
   forgotPassword: (data) => apiClient.post('/auth/forgot-password', data),
   resetPassword: (data) => apiClient.post('/auth/reset-password', data),

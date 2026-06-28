@@ -49,7 +49,7 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
-categorySchema.index({ slug: 1 });
-categorySchema.index({ parent: 1 });
+// slug already has a unique index from `unique: true` — no separate index needed.
+categorySchema.index({ parent: 1, isActive: 1, order: 1 });
 
 export default mongoose.model('Category', categorySchema);

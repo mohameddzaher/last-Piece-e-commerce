@@ -90,31 +90,78 @@ router.post('/', async (req, res, next) => {
       };
     });
 
-    const sale = await Sale.create({
-      ...rest,
-      channel: 'offline',
-      items: enrichedItems,
-      soldBy: req.user.id,
-    });
-
-    // Mark products as sold
-    for (const p of products) {
-      p.location = 'sold';
-      p.status = 'inactive';
-      p.locationHistory.push({
-        location: 'sold',
-        changedAt: new Date(),
-        changedBy: req.user.id,
-        notes: `Sold offline (${sale.saleNumber})`,
-      });
-      await p.save();
-      emitProductChange('product:updated', resolveProductImageUrls(p));
+    // Atomically claim each pair BEFORE creating the sale, so an offline sale and
+    // an online order (or two registers) can't sell the same one-of-one pair.
+    // Conditional update only matches an unsold, Egypt-located, active pair.
+    const claimed = [];
+    let conflict = null;
+    for (const it of items) {
+      const p = productMap[String(it.product)];
+      const updated = await Product.findOneAndUpdate(
+        {
+          _id: p._id,
+          status: 'active',
+          location: { $in: ['egypt-online', 'egypt-offline', 'egypt-both'] },
+        },
+        {
+          $set: { location: 'sold', status: 'inactive' },
+          $push: {
+            locationHistory: {
+              location: 'sold',
+              changedAt: new Date(),
+              changedBy: req.user.id,
+              notes: 'Sold offline',
+            },
+          },
+        },
+        { new: true }
+      );
+      if (!updated) { conflict = p; break; }
+      claimed.push({ id: p._id, prevLocation: p.location, doc: updated });
     }
 
-    emitSaleChange('sale:created', sale);
-    emitDashboardRefresh();
+    if (conflict) {
+      await Promise.all(
+        claimed.map((c) =>
+          Product.updateOne(
+            { _id: c.id },
+            { $set: { location: c.prevLocation, status: 'active' } }
+          )
+        )
+      );
+      return res.status(409).json({
+        success: false,
+        message: `${conflict.name} was just sold and is no longer available.`,
+      });
+    }
+
+    let sale;
+    try {
+      sale = await Sale.create({
+        ...rest,
+        channel: 'offline',
+        items: enrichedItems,
+        soldBy: req.user.id,
+      });
+    } catch (err) {
+      await Promise.all(
+        claimed.map((c) =>
+          Product.updateOne(
+            { _id: c.id },
+            { $set: { location: c.prevLocation, status: 'active' } }
+          )
+        )
+      );
+      throw err;
+    }
 
     res.status(201).json({ success: true, data: sale });
+
+    claimed.forEach((c) =>
+      emitProductChange('product:updated', resolveProductImageUrls(c.doc))
+    );
+    emitSaleChange('sale:created', sale);
+    emitDashboardRefresh();
   } catch (e) { next(e); }
 });
 

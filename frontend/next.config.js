@@ -26,10 +26,48 @@ const nextConfig = {
   },
 
   // Enhanced security headers
-  headers: async () => [
+  headers: async () => {
+    // Build a Content-Security-Policy. This is the main XSS blast-radius
+    // reducer: even if a script is injected, it can't exfiltrate data to an
+    // arbitrary host (connect-src), load plugins (object-src), or be framed
+    // (frame-ancestors). Allow the API + socket origins for fetch/websocket.
+    const api = process.env.NEXT_PUBLIC_API_URL || "https://last-piece-4l3u.onrender.com/api";
+    const apiOrigin = api.replace(/\/api\/?$/, "");
+    const socket = process.env.NEXT_PUBLIC_SOCKET_URL || apiOrigin;
+    const wsOrigins = [apiOrigin, socket]
+      .map((o) => o.replace(/^http/, "ws"))
+      .join(" ");
+    const connectSrc = [
+      "'self'",
+      apiOrigin,
+      socket,
+      wsOrigins,
+      "http://localhost:5001",
+      "ws://localhost:5001",
+    ].join(" ");
+    const csp = [
+      "default-src 'self'",
+      // Next.js injects inline hydration scripts; without a nonce pipeline we
+      // allow inline. unsafe-eval kept only in dev (Next fast-refresh needs it).
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      `connect-src ${connectSrc}`,
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; ");
+
+    return [
     {
       source: "/:path*",
       headers: [
+        {
+          key: "Content-Security-Policy",
+          value: csp,
+        },
         {
           key: "X-DNS-Prefetch-Control",
           value: "on",
@@ -60,7 +98,8 @@ const nextConfig = {
         },
       ],
     },
-  ],
+    ];
+  },
 
   // Compression
   compress: true,

@@ -129,14 +129,19 @@ export const getAllProducts = async (req, res, next) => {
       if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
     }
 
-    const products = await Product.find(filter)
-      .populate("category")
-      .populate("brandRef")
-      .sort(sort)
-      .skip(skip)
-      .limit(pageLimit);
-
-    const total = await Product.countDocuments(filter);
+    // List + count concurrently; .lean() is safe because the downstream helpers
+    // (resolveProductsImageUrls / filterProductsForRole) already accept plain
+    // objects, and it avoids hydrating full Mongoose docs on the hottest endpoint.
+    const [products, total] = await Promise.all([
+      Product.find(filter)
+        .populate("category")
+        .populate("brandRef")
+        .sort(sort)
+        .skip(skip)
+        .limit(pageLimit)
+        .lean(),
+      Product.countDocuments(filter),
+    ]);
 
     const resolved = resolveProductsImageUrls(products);
     const data = filterProductsForRole(resolved, role);
@@ -168,15 +173,18 @@ export const getProductBySlug = async (req, res, next) => {
 
     const product = await Product.findOne(queryFilter)
       .populate("category")
-      .populate("brandRef");
+      .populate("brandRef")
+      .lean();
 
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
 
     if (!isStaffRole(role)) {
-      product.viewCount += 1;
-      await product.save();
+      // Atomic, fire-and-forget — a read-modify-write `save()` on a GET both
+      // races (lost increments under concurrent views) and forces a full-doc
+      // write on the hot detail page. $inc is single-op and non-blocking.
+      Product.updateOne({ _id: product._id }, { $inc: { viewCount: 1 } }).catch(() => {});
     }
 
     const resolved = resolveProductImageUrls(product);
@@ -331,16 +339,22 @@ export const searchProducts = async (req, res, next) => {
 
     if (!query) return res.status(200).json({ success: true, data: [] });
 
+    // Cap the limit so a client can't request ?limit=100000 and scan the catalog.
+    const cap = Math.min(50, Math.max(1, parseInt(limit) || 10));
+    // Escape regex metacharacters — raw user input in $regex is a ReDoS / scan vector.
+    const safe = String(query).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const baseFilter = buildLocationFilter(role);
     const products = await Product.find({
       ...baseFilter,
       $or: [
-        { name: { $regex: query, $options: "i" } },
-        { description: { $regex: query, $options: "i" } },
-        { brand: { $regex: query, $options: "i" } },
-        { sku: { $regex: query, $options: "i" } },
+        { name: { $regex: safe, $options: "i" } },
+        { description: { $regex: safe, $options: "i" } },
+        { brand: { $regex: safe, $options: "i" } },
+        { sku: { $regex: safe, $options: "i" } },
       ],
-    }).limit(parseInt(limit));
+    })
+      .limit(cap)
+      .lean();
 
     const resolved = resolveProductsImageUrls(products);
     res.status(200).json({ success: true, data: filterProductsForRole(resolved, role) });
@@ -355,17 +369,20 @@ export const getRelatedProducts = async (req, res, next) => {
     const { limit = 4 } = req.query;
     const role = req.user?.role || "customer";
 
-    const product = await Product.findById(id);
+    const product = await Product.findById(id).select("category tags").lean();
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
 
+    const cap = Math.min(20, Math.max(1, parseInt(limit) || 4));
     const baseFilter = buildLocationFilter(role);
     const relatedProducts = await Product.find({
       ...baseFilter,
       $or: [{ category: product.category }, { tags: { $in: product.tags || [] } }],
       _id: { $ne: id },
-    }).limit(parseInt(limit));
+    })
+      .limit(cap)
+      .lean();
 
     const resolved = resolveProductsImageUrls(relatedProducts);
     res.status(200).json({ success: true, data: filterProductsForRole(resolved, role) });
@@ -463,16 +480,32 @@ export const getInventoryByLocation = async (req, res, next) => {
           ? { location: { $in: ["egypt-offline", "egypt-both"] } }
           : { location: bucket };
 
-    const products = await Product.find(filter)
-      .populate("category")
-      .populate("brandRef")
-      .sort("-createdAt");
+    // Paginate — the "sold" bucket grows without bound, so returning the whole
+    // thing would eventually OOM the response and the client.
+    const { page = 1, limit = 50 } = req.query;
+    const { skip, limit: pageLimit } = calculatePagination(page, limit);
+    const [products, total] = await Promise.all([
+      Product.find(filter)
+        .populate("category")
+        .populate("brandRef")
+        .sort("-createdAt")
+        .skip(skip)
+        .limit(pageLimit)
+        .lean(),
+      Product.countDocuments(filter),
+    ]);
 
     const resolved = resolveProductsImageUrls(products);
     res.status(200).json({
       success: true,
       data: filterProductsForRole(resolved, role),
-      total: products.length,
+      total,
+      pagination: {
+        total,
+        pages: Math.ceil(total / pageLimit),
+        currentPage: parseInt(page),
+        pageSize: pageLimit,
+      },
     });
   } catch (error) {
     next(error);

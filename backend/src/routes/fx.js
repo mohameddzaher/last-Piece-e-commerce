@@ -1,6 +1,7 @@
 import express from 'express';
 import FxSnapshot from '../models/FxSnapshot.js';
 import FxReference from '../models/FxReference.js';
+import FxRateHistory from '../models/FxRateHistory.js';
 import Product from '../models/Product.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -221,8 +222,10 @@ router.put('/reference', protect, authorize('super-admin', 'admin'), async (req,
 
     const existing = await FxReference.findOne({ from, to });
     if (existing) {
-      // Push current state to history
-      existing.history.push({
+      // Archive the superseded rate to the history collection (append-only).
+      await FxRateHistory.create({
+        from,
+        to,
         rate: existing.rate,
         setAt: existing.setAt,
         setBy: existing.setBy,
@@ -257,12 +260,15 @@ router.get('/reference/history', protect, authorize('admin', 'super-admin'), asy
   try {
     const from = (req.query.from || 'SAR').toUpperCase();
     const to = (req.query.to || 'EGP').toUpperCase();
-    const ref = await FxReference.findOne({ from, to })
-      .populate('setBy', 'firstName lastName')
-      .populate('history.setBy', 'firstName lastName');
+    const ref = await FxReference.findOne({ from, to }).populate('setBy', 'firstName lastName');
     if (!ref) return res.json({ success: true, data: [] });
+    // History rows (capped) + the current rate, newest first.
+    const history = await FxRateHistory.find({ from, to })
+      .populate('setBy', 'firstName lastName')
+      .sort({ setAt: -1 })
+      .limit(500)
+      .lean();
     const timeline = [
-      ...(ref.history || []),
       {
         rate: ref.rate,
         setAt: ref.setAt,
@@ -272,6 +278,7 @@ router.get('/reference/history', protect, authorize('admin', 'super-admin'), asy
         note: ref.note,
         current: true,
       },
+      ...history,
     ].sort((a, b) => new Date(b.setAt) - new Date(a.setAt));
     res.json({ success: true, data: timeline });
   } catch (e) { next(e); }

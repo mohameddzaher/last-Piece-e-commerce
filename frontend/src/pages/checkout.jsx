@@ -20,7 +20,7 @@ import { toast } from 'react-toastify';
 export default function Checkout() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
-  const { items, total, clearCart } = useCartStore();
+  const { items, total, clearCart, appliedPromo } = useCartStore();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [sameAsShipping, setSameAsShipping] = useState(true);
@@ -91,6 +91,8 @@ export default function Checkout() {
     const orderData = {
       ...formData,
       billingAddress: sameAsShipping ? formData.shippingAddress : formData.billingAddress,
+      // Send only the code — the backend re-validates and computes the real discount.
+      promoCode: appliedPromo?.code || undefined,
     };
 
     try {
@@ -112,9 +114,14 @@ export default function Checkout() {
   //   tax: no VAT applied on consumer checkout for now (0%). If the
   //   super-admin ever enables VAT, update this in one place.
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal > 5000 ? 0 : 100;
+  // Threshold is inclusive (>=) to match the cart page — at exactly 5,000 EGP
+  // both screens must agree that shipping is free.
+  const freeShipFromPromo = !!appliedPromo?.freeShipping;
+  const shipping = subtotal >= 5000 || freeShipFromPromo ? 0 : 100;
   const tax = 0;
-  const orderTotal = subtotal + shipping + tax;
+  // Discount carried from the cart (display only; backend re-validates & charges).
+  const discount = Math.min(appliedPromo?.discount || 0, subtotal);
+  const orderTotal = Math.max(0, subtotal - discount) + shipping + tax;
   const fmt = (n) => `EGP ${Math.round(n).toLocaleString()}`;
 
   if (items.length === 0) {
@@ -582,6 +589,12 @@ export default function Checkout() {
                   <span className='text-gray-400'>Shipping</span>
                   <span className='text-white'>{shipping === 0 ? 'Free' : fmt(shipping)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className='flex justify-between text-sm'>
+                    <span className='text-emerald-400'>Discount {appliedPromo?.code ? `(${appliedPromo.code})` : ''}</span>
+                    <span className='text-emerald-400'>− {fmt(discount)}</span>
+                  </div>
+                )}
                 {tax > 0 && (
                   <div className='flex justify-between text-sm'>
                     <span className='text-gray-400'>Tax</span>

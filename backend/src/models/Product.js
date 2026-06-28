@@ -225,12 +225,10 @@ const productSchema = new mongoose.Schema(
         default: 0,
       },
     },
-    reviews: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Review',
-      },
-    ],
+    // NOTE: reviews are NOT embedded here. They live in the `Review` collection
+    // (indexed by productId) and are queried on demand. Embedding an unbounded,
+    // ever-growing array of review refs on the hot product document would bloat
+    // every catalog read and risk the 16 MB BSON ceiling on popular products.
     viewCount: {
       type: Number,
       default: 0,
@@ -321,14 +319,17 @@ productSchema.pre('save', async function (next) {
 // Text index for search
 productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 
-// Index for common queries
-productSchema.index({ slug: 1 });
-productSchema.index({ category: 1 });
-productSchema.index({ status: 1 });
-productSchema.index({ createdAt: -1 });
-productSchema.index({ location: 1 });
-productSchema.index({ brandRef: 1 });
-productSchema.index({ gender: 1 });
+// Compound indexes for the storefront's faceted browsing. The leading `location`
+// + `status` match the public list filter (buildLocationFilter), and the trailing
+// sort key lets Mongo satisfy filter+sort from one index (no in-memory sort).
+// NOTE: slug/sku already get a unique index from `unique: true` — no need to
+// declare them again here.
+productSchema.index({ location: 1, status: 1, createdAt: -1 });
+productSchema.index({ location: 1, status: 1, price: 1 });
+productSchema.index({ location: 1, status: 1, category: 1, createdAt: -1 });
+productSchema.index({ location: 1, status: 1, brandRef: 1, createdAt: -1 });
+productSchema.index({ location: 1, status: 1, gender: 1, createdAt: -1 });
+productSchema.index({ status: 1, createdAt: -1 });
 productSchema.index({ shipment: 1 });
 
 export default mongoose.model('Product', productSchema);

@@ -1,6 +1,8 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { filterProductForRole } from '../utils/roleVisibility.js';
+import { getRedis, redisEnabled } from '../config/redis.js';
 
 let io = null;
 
@@ -21,6 +23,25 @@ export const initSocket = (httpServer) => {
     },
     transports: ['websocket', 'polling'],
   });
+
+  // Multi-instance fan-out: with Redis, an event emitted on one instance reaches
+  // clients connected to any other instance. Without REDIS_URL this is skipped
+  // and a single instance works as before.
+  if (redisEnabled()) {
+    (async () => {
+      try {
+        const pubClient = await getRedis();
+        if (pubClient) {
+          const subClient = pubClient.duplicate();
+          await subClient.connect();
+          io.adapter(createAdapter(pubClient, subClient));
+          console.log('🛰  socket.io using Redis adapter (multi-instance)');
+        }
+      } catch (e) {
+        console.error('⚠️  socket.io Redis adapter failed, using in-memory:', e.message);
+      }
+    })();
+  }
 
   // Optional JWT auth — unauthenticated clients still connect (for public site updates)
   io.use((socket, next) => {
